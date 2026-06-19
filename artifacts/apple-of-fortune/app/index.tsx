@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   SharedValue,
@@ -49,6 +50,9 @@ import {
 } from "@/constants/game";
 
 const APP_ICON = require("../assets/images/icon.png");
+
+// shared smooth ease-in-out curve for every timed animation
+const EASE = Easing.inOut(Easing.ease);
 
 type SpriteName = keyof typeof SPRITES;
 
@@ -88,11 +92,14 @@ export default function AppleOfFortune() {
   // ----- layout math (mirrors the 1080px reference grid) -----
   const H_PAD = 8;
   const PILL_COL = Math.round(width * 0.135);
-  const tilesArea = width - H_PAD * 2 - PILL_COL;
+  // breathing room between the multiplier column and the first game column
+  const COL_GAP = Math.round(width * 0.028);
+  const tilesArea = width - H_PAD * 2 - PILL_COL - COL_GAP;
   const colPitch = tilesArea / COLS;
   const tile = colPitch * 0.98;
   const pitchY = tile * 0.8;
-  const boardTop = insets.top + 96;
+  // nudge the whole board down a touch so high multipliers don't crowd the top
+  const boardTop = insets.top + 112;
   const boardHeight = VISIBLE_ROWS * pitchY + (tile - pitchY);
 
   const bottomVisible = Math.max(
@@ -102,7 +109,7 @@ export default function AppleOfFortune() {
   const railY = (bottomVisible - 2) * pitchY;
   const scroll = useSharedValue(railY);
   useEffect(() => {
-    scroll.value = withTiming(railY, { duration: 300 });
+    scroll.value = withTiming(railY, { duration: 360, easing: EASE });
   }, [railY, scroll]);
   const railStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: scroll.value }],
@@ -113,8 +120,8 @@ export default function AppleOfFortune() {
   useEffect(() => {
     pulse.value = withRepeat(
       withSequence(
-        withTiming(1.05, { duration: 720 }),
-        withTiming(1, { duration: 720 }),
+        withTiming(1.05, { duration: 760, easing: EASE }),
+        withTiming(1, { duration: 760, easing: EASE }),
       ),
       -1,
       true,
@@ -274,7 +281,7 @@ export default function AppleOfFortune() {
     if (row < currentRow) {
       if (picks[row] === col)
         return { sprite: "apple", opacity: 1, revealedTile: true };
-      return { sprite: "wood", opacity: 0.4, revealedTile: false };
+      return { sprite: "wood", opacity: 0.52, revealedTile: false };
     }
     if (row === currentRow) {
       return { sprite: "sprout", opacity: 1, revealedTile: false };
@@ -282,7 +289,7 @@ export default function AppleOfFortune() {
     const dist = row - currentRow;
     return {
       sprite: "wood",
-      opacity: dist <= 2 ? 0.92 : 0.42,
+      opacity: dist <= 2 ? 0.96 : 0.56,
       revealedTile: false,
     };
   };
@@ -312,7 +319,7 @@ export default function AppleOfFortune() {
         contentFit="cover"
       />
       <BlurView
-        intensity={18}
+        intensity={12}
         tint="dark"
         style={StyleSheet.absoluteFill}
       />
@@ -405,7 +412,7 @@ export default function AppleOfFortune() {
                   </View>
                 </View>
 
-                <View style={styles.tilesRow}>
+                <View style={[styles.tilesRow, { marginLeft: COL_GAP }]}>
                   {Array.from({ length: COLS }, (_, col) => {
                     const t = tileTypeFor(row, col);
                     const tappable = isActive;
@@ -552,7 +559,7 @@ function Tile({
   const prevSprite = useRef(sprite);
 
   useEffect(() => {
-    op.value = withTiming(opacity, { duration: 220 });
+    op.value = withTiming(opacity, { duration: 240, easing: EASE });
   }, [opacity, op]);
 
   useEffect(() => {
@@ -560,9 +567,9 @@ function Tile({
       prevSprite.current = sprite;
       if (revealedTile) {
         reveal.value = withSequence(
-          withTiming(0.82, { duration: 90 }),
-          withTiming(1.1, { duration: 130 }),
-          withTiming(1, { duration: 110 }),
+          withTiming(0.84, { duration: 110, easing: EASE }),
+          withTiming(1.1, { duration: 150, easing: EASE }),
+          withTiming(1, { duration: 140, easing: EASE }),
         );
       }
     }
@@ -576,14 +583,31 @@ function Tile({
     [isActive],
   );
 
+  const glossy = sprite === "apple" || sprite === "core" || sprite === "sprout";
+
   return (
     <Animated.View style={[styles.tileShadow, aStyle]}>
       <Image
         source={SPRITES[sprite]}
         contentFit="contain"
-        transition={{ duration: 240, effect: "cross-dissolve" }}
+        transition={{ duration: 260, effect: "cross-dissolve" }}
         style={{ width: size, height: size }}
       />
+      {glossy && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.gloss,
+            {
+              width: size * 0.46,
+              height: size * 0.16,
+              top: size * 0.14,
+              left: size * 0.2,
+              borderRadius: size * 0.1,
+            },
+          ]}
+        />
+      )}
     </Animated.View>
   );
 }
@@ -607,8 +631,8 @@ function PopValue({
       return;
     }
     scale.value = withSequence(
-      withTiming(1.16, { duration: 110 }),
-      withTiming(1, { duration: 150 }),
+      withTiming(1.16, { duration: 130, easing: EASE }),
+      withTiming(1, { duration: 170, easing: EASE }),
     );
   }, [value, scale]);
   const aStyle = useAnimatedStyle(() => ({
@@ -747,7 +771,7 @@ function EndControls({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0c2b27" },
-  bgTint: { backgroundColor: "rgba(8,30,28,0.32)" },
+  bgTint: { backgroundColor: "rgba(8,30,28,0.24)" },
 
   headerStrip: {
     backgroundColor: PALETTE.headerStrip,
@@ -845,10 +869,14 @@ const styles = StyleSheet.create({
   tileCell: { alignItems: "center", justifyContent: "center" },
   tileShadow: {
     shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
+    shadowOpacity: 0.14,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1.5 },
+    elevation: 1,
+  },
+  gloss: {
+    position: "absolute",
+    backgroundColor: "rgba(255,255,255,0.16)",
   },
 
   overlay: {

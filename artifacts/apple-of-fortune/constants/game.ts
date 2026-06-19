@@ -27,19 +27,19 @@ export const SPRITES = {
 };
 
 export const PALETTE = {
-  headerStrip: "#2a2e2f",
-  balancePill: "#1c1f20",
-  orange: "#f5821f",
-  button: "#1b5f72",
-  buttonDark: "#06303d",
-  inputBg: "#04313f",
-  cashout: "#1b5f72",
-  green: "#a4d13c",
-  greenDark: "#7fb01f",
-  text: "#ffffff",
-  textMuted: "#9bb0ac",
-  pillBg: "#0c2b2a",
-  bonus: "#1c1f20",
+  headerStrip: "#2d3132",
+  balancePill: "#212425",
+  orange: "#ef861f",
+  button: "#22647a",
+  buttonDark: "#0a3744",
+  inputBg: "#093846",
+  cashout: "#22647a",
+  green: "#9ec256",
+  greenDark: "#7aa23a",
+  text: "#f3f7f5",
+  textMuted: "#9fb2ae",
+  pillBg: "#11302e",
+  bonus: "#212425",
 };
 
 // ---- Admin / debug settings ----

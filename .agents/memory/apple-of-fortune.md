@@ -35,3 +35,11 @@ the board/admin menu — that is the only reliable visual validation here.
 - "Numbers update in jumps": values snap to the final amount with a subtle scale pop —
   do NOT add incremental count-up animation.
 - Cash-out reuses the same win ("G'alaba!") overlay/end-state as a top-row win.
+- Sprite gloss is a plain semi-transparent white rounded View overlaid on apple/core/sprout
+  (NOT wood) — no gradient lib needed; keep opacity low (~0.16) so it reads as a sheen.
+- Board is nudged down via boardTop (insets.top + ~112): with a fixed 7-row window over 9
+  rows, the top multiplier row unavoidably reaches the board's top edge near x349, so the
+  ONLY way to keep "spacing from the screen top" at high multipliers is a larger boardTop —
+  you cannot translate board content down without clipping the rows still being climbed.
+- A real horizontal gap between the pill column and tiles needs its own COL_GAP subtracted
+  from tilesArea AND a marginLeft on the tiles row (widening PILL_COL just makes pills bigger).
