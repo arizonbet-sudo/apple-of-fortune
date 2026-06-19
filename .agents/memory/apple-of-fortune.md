@@ -9,13 +9,19 @@ Multiplier-ladder gambling clone, virtual currency only, no backend. Built from 
 reference screenshots (1080x2340). Keep the Uzbek UI text exactly as in the screenshots.
 
 ## Sprite source crops (NOT derivable from code — needed to re-extract)
-Sprites saved 160x160, circular-masked, in assets/images/: wood, sprout, apple, core, bg.
-Crop centers in the 1080-wide screenshots: WOOD (615,664); CORE (460,664);
-APPLE (280,985); SPROUT (615,1160). bg = jungle crop 1080x400+0+1610, stretched + blurred.
-DECISION: re-extracting sharper sprites is NOT worth it — tiles touch each other, so any
-crop catches neighbor slivers, and the existing 160px masks are already native-res. Improve
-perceived quality via rendering instead (expo-blur backdrop, tile drop-shadows, expo-image
-cross-dissolve transition to kill the black flash on source swap), not bigger source crops.
+Sprites saved 160x160, circular-masked (alpha 0 outside a radius-~79 circle), in
+assets/images/: wood, sprout, apple, core, bg. The current apple/wood/sprout were
+re-extracted from the OPEN-board reference Screenshot_20260619_125823 (1080x2340),
+which is the most faithful source because tiles there do NOT touch — clean per-tile crops.
+160x160 crop centers in that screenshot: APPLE (450,667) [x69.93 col2];
+WOOD (637,667) [x69.93 col3]; SPROUT/mushroom (637,451) [top row col3].
+Extraction: crop 160x160 centered, then CopyOpacity with a white circle (radius ~79) mask.
+core: kept the original eaten-apple-core sprite, warm/brightened (modulate 112,118,99) to
+sit with the new warmer wood. bg: original jungle bg.png brightened (modulate 110,107,100).
+DECISION (UPDATED): extracting straight from the target reference makes tile colors
+pixel-exact BY CONSTRUCTION — far better than code tints/overlays, which can only
+uniformly lighten/darken and CANNOT fix per-color hue/saturation. The earlier "not worth
+re-extracting" note applied only to the OLD refs where tiles touched.
 
 ## Board geometry (corrected against the user's original-game screenshots)
 PILL_COL ≈ width*0.142. colPitch = (width - 2*H_PAD - PILL_COL - COL_GAP)/5.

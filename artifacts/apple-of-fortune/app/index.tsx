@@ -773,7 +773,7 @@ function EndControls({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0c2b27" },
-  bgTint: { backgroundColor: "rgba(7,28,30,0.14)" },
+  bgTint: { backgroundColor: "rgba(7,28,30,0.06)" },
 
   headerStrip: {
     backgroundColor: PALETTE.headerStrip,
@@ -871,14 +871,14 @@ const styles = StyleSheet.create({
   tileCell: { alignItems: "center", justifyContent: "center" },
   tileShadow: {
     shadowColor: "#000",
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
   gloss: {
     position: "absolute",
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.07)",
   },
 
   overlay: {
