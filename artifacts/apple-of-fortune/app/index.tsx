@@ -100,8 +100,9 @@ export default function AppleOfFortune() {
   const tile = colPitch * 0.89;
   // vertical pitch larger than the tile so rows are separated by a small gap (no overlap)
   const pitchY = tile * 1.15;
-  // nudge the whole board down a touch so high multipliers don't crowd the top
-  const boardTop = insets.top + 170;
+  // nudge the whole board down a touch so high multipliers don't crowd the top,
+  // but keep it high enough that the bottom row clears the Current Win panel during play
+  const boardTop = insets.top + 140;
   const boardHeight = VISIBLE_ROWS * pitchY + (tile - pitchY);
 
   const bottomVisible = Math.max(

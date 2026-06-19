@@ -55,6 +55,19 @@ gap_ref px × (deviceWidth/1080) = gap_device, then set OFFSET so on-screen
 first-row tile-top y≈566 -> gap 244 ref ≈ 91 device; OFFSET 116 was too high, 170 matches.
 Measure edges programmatically from a saved screenshot (screenshot tool save_to) — per-row
 gray-brightness profile for the title band, wood-color threshold (R>110 & G<110) for tile top.
+TRADEOFF (bottom clearance vs top spacing): boardTop is the ONLY lever and the board is a
+FIXED height (~7 rows, ~450 device px) — pushing it down to perfect the top gap shoves the
+bottom row into the bottom controls on SHORT preview panes. The "MAVJUD YUTUQ" (Current Win)
+panel — the PlayingControls winInfoBar, only shown mid-round — has a semi-opaque background,
+so its overlap with the bottom tile row is VISUALLY obvious; the betting-state buttons have
+transparent gaps so their (worse) overlap is NOT noticed. Validate the bottom gap in the
+PLAYING state (runTest: GAROV then tap a tile) at a SHORT viewport (~400x720), not just 874
+(at 874 the gap is huge and hides the problem). Reducing boardHeight is NOT an option — the
+board has overflow:hidden so a shorter height just clips the bottom row. boardTop 170 matched
+the reference top but gave only ~8-12px bottom gap at 720; 140 restores a clean ~40px gap
+while keeping a comfortable title->first-row gap. There is no separate internal bottom
+padding/offset constant — tiles sit ~4px above the board's bottom edge by the (tile-pitchY)
+height term; the only way to make tiles "sit higher" is to lower boardTop.
 
 ## Verifying the UI (screenshot gotcha)
 The app shows a ~1100ms branded loading overlay on mount that fades out. The screenshot
