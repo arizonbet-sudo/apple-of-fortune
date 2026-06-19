@@ -27,12 +27,24 @@ Good full-brightness sources & centers:
 DECISION: extracting straight from the reference makes tile colors pixel-exact BY CONSTRUCTION;
 code tints/overlays only uniformly lighten/darken and CANNOT fix per-color hue/saturation.
 
-## Board geometry (corrected against the user's original-game screenshots)
-PILL_COL ≈ width*0.142. colPitch = (width - 2*H_PAD - PILL_COL - COL_GAP)/5.
-The original board is OPEN: tiles do NOT touch. Tile diameter ≈ 0.89*colPitch (clear
-horizontal gap) and crucially the VERTICAL pitch is LARGER than the tile —
-pitchY slightly LARGER than the tile (small gap between rows, NO overlap). 7 of 9 rows
-visible. Do NOT pack rows so they touch/overlap — that reads as cramped and is wrong.
+## Board geometry — ONE measured master grid (do NOT go back to ad-hoc per-axis constants)
+The user rejected the old layout (separate PILL_COL + COL_GAP + colPitch + pitchY=tile*1.15)
+because horizontal pitch ≠ vertical pitch and the pill column was off-grid → "inconsistent,
+drifting" rows. The original game is actually ONE uniform SQUARE grid; rebuild on that.
+Measured from the 1080-wide reference (Screenshot_...125812...) by wood-color column/row scans:
+- 6 columns = 1 multiplier pill (col 0) + 5 tile columns, ALL on the same pitch.
+- Tile column centers x = 278,447,616,784,953 → column pitch ≈ 169 ref px. Green pill center
+  x ≈ 108 = 278−170, so the pill is just column 0 of the same grid.
+- Tile & pill diameter ≈ 147 ref px (measure on a FULL-BRIGHT row; vertical scans
+  under-read the diameter ~123 because the wood circle's top/bottom is shaded).
+- Row pitch ≈ 170 ref px ≈ column pitch → treat as SQUARE: use ONE `pitch` for both axes.
+Implementation (current): `gridScale=width/1080; tile=147*gridScale; pitch=169.5*gridScale;
+pitchY=pitch;` render each row as 6 equal `pitch`-wide square cells, content (pill/tile)
+size=`tile` centered in each cell, row paddingLeft=`gridLeft=(width-6*pitch)/2` → perfectly
+centered, identical gaps everywhere, zero per-row drift. tile/pitch ≈ 0.867 (open board,
+tiles never touch). 7 of 9 rows visible. Verified at 402-wide: columns & rows both ~63 px
+pitch. Pill width set to `tile`; keep pill text fontSize ~10 + small padding so "x 349.68"
+fits the ~55px cell.
 
 ## Per-row tile opacity must match the reference's dimming (visual)
 In tileTypeFor: PAST already-climbed unpicked rows render dimmed — opacity 0.6 is CORRECT
@@ -57,9 +69,9 @@ white text / green active pill, at exact row centers; pitch ~170 ref px). Refere
 (Screenshot_...125812..., 1080x2340): title center y≈307; x349.68 pill/row center y≈484 →
 title-center→top-row-center gap = 177 ref px. Scale = deviceWidth/1080 ≈ 0.372 (viewport
 ~402x874 ≈ same aspect 0.46) → ~66 device px. So at 402-wide: title center ≈78, top-row
-center should be ≈144 → **OFFSET 122** (verified: 122 gives top-row center 145, gap 67).
-Earlier OFFSETs 170 and 140 were too low because they measured from the first bright row;
-116 was close; 122 is the reference-correct value.
+center should be ≈144. After the master-grid rebuild the value is **boardTop = insets.top + 121**
+(verified at 402-wide: top-row center 145, gap 67). NOTE the absolute number is tied to the
+current grid `pitch`/`tile`; if you change the grid scale, re-measure and retune boardTop.
 Measure programmatically from a saved screenshot (screenshot tool save_to, after temporarily
 lowering the loading timeout line ~91 from 1100→50 then REVERTING): per-row gray-brightness for
 the title band, wood-color threshold (R>110 & G<110) for tile rows, white/green threshold for
@@ -70,7 +82,9 @@ DOWN shoves the bottom row into the controls on SHORT panes; the "MAVJUD YUTUQ" 
 (semi-opaque, only mid-round) makes overlap visually obvious. Validate in the PLAYING state
 (runTest: GAROV then tap a tile) at ~400x720. The reference deliberately leaves a LARGE
 board→panel jungle gap, so the correct (higher) boardTop also clears the panel — moving the
-board UP only increases bottom clearance. 122 < 140 (already-clean), so 122 is safe.
+board UP only increases bottom clearance. The square grid (pitch≈63 at 402-wide) is shorter
+than the old pitchY=tile*1.15, so the board is slightly shorter → bottom clearance improved;
+boardTop 121 verified clean in the PLAYING state.
 
 ## Verifying the UI (screenshot gotcha)
 The app shows a ~1100ms branded loading overlay on mount that fades out. The screenshot
@@ -91,5 +105,6 @@ the board/admin menu — that is the only reliable visual validation here.
   multiplier row unavoidably reaches the board's top edge near x349, so the ONLY way to keep
   "spacing from the screen top" at high multipliers is a larger boardTop — you cannot
   translate board content down without clipping the rows still being climbed.
-- A real horizontal gap between the pill column and tiles needs its own COL_GAP subtracted
-  from tilesArea AND a marginLeft on the tiles row (widening PILL_COL just makes pills bigger).
+- The pill column is NOT special-cased anymore — it is column 0 of the same master grid, so
+  the pill/tile horizontal gap falls out of the uniform `pitch` automatically (no COL_GAP /
+  separate tilesArea). Do not reintroduce per-axis or per-column spacing constants.

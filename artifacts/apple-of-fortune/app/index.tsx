@@ -89,21 +89,24 @@ export default function AppleOfFortune() {
     return () => clearTimeout(id);
   }, []);
 
-  // ----- layout math (mirrors the 1080px reference grid) -----
-  const H_PAD = 8;
-  const PILL_COL = Math.round(width * 0.142);
-  // breathing room between the multiplier column and the first game column
-  const COL_GAP = Math.round(width * 0.022);
-  const tilesArea = width - H_PAD * 2 - PILL_COL - COL_GAP;
-  const colPitch = tilesArea / COLS;
-  // smaller tiles with clear horizontal gaps, like the original (tiles do NOT touch)
-  const tile = colPitch * 0.89;
-  // vertical pitch larger than the tile so rows are separated by a small gap (no overlap)
-  const pitchY = tile * 1.15;
-  // board Y derived from the reference: title-center -> top-row(x349.68)-center gap
-  // is 177 ref px (1080x2340) -> x0.372 ~= 66 device px (top-row center ~143px down at
-  // 402-wide, measured). keeps a large jungle gap before the Current Win panel.
-  const boardTop = insets.top + 122;
+  // ----- master grid -----
+  // ONE uniform, centered grid derived by measuring the 1080px original:
+  //   - 6 columns = 1 multiplier pill + 5 tile columns
+  //   - tile & pill diameter = 147 ref px
+  //   - column pitch = 169 ref px, row pitch = 170 ref px (identical -> square)
+  // Every tile/pill sits on this single pitch so spacing is identical across
+  // all rows and columns with no per-row drift.
+  const REF_W = 1080;
+  const gridScale = width / REF_W;
+  const tile = 147 * gridScale; // tile + pill diameter
+  const pitch = 169.5 * gridScale; // one pitch for BOTH axes (square grid)
+  const pitchY = pitch;
+  const GRID_COLS = COLS + 1; // pill column + 5 tile columns
+  // center the whole 6-column strip horizontally (perfectly centered)
+  const gridLeft = (width - GRID_COLS * pitch) / 2;
+  // board Y derived from the reference: title-center -> top-row-center gap
+  // 177 ref px -> ~66 device px; keeps a large jungle gap before the win panel.
+  const boardTop = insets.top + 121;
   const boardHeight = VISIBLE_ROWS * pitchY + (tile - pitchY);
 
   const bottomVisible = Math.max(
@@ -389,7 +392,7 @@ export default function AppleOfFortune() {
       <View
         style={[
           styles.board,
-          { top: boardTop, height: boardHeight, paddingHorizontal: H_PAD },
+          { top: boardTop, height: boardHeight },
         ]}
       >
         <Animated.View style={[styles.rail, railStyle]}>
@@ -400,10 +403,20 @@ export default function AppleOfFortune() {
             return (
               <View
                 key={row}
-                style={[styles.rowAbs, { top: railTop, height: pitchY }]}
+                style={[
+                  styles.rowAbs,
+                  { top: railTop, height: pitchY, paddingLeft: gridLeft },
+                ]}
               >
-                <View style={[styles.pillWrap, { width: PILL_COL }]}>
-                  <View style={[styles.pill, isActive && styles.pillActive]}>
+                {/* column 0: multiplier pill */}
+                <View style={[styles.cell, { width: pitch, height: pitchY }]}>
+                  <View
+                    style={[
+                      styles.pill,
+                      { width: tile },
+                      isActive && styles.pillActive,
+                    ]}
+                  >
                     <Text
                       style={[
                         styles.pillText,
@@ -416,32 +429,28 @@ export default function AppleOfFortune() {
                   </View>
                 </View>
 
-                <View style={[styles.tilesRow, { marginLeft: COL_GAP }]}>
-                  {Array.from({ length: COLS }, (_, col) => {
-                    const t = tileTypeFor(row, col);
-                    const tappable = isActive;
-                    return (
-                      <Pressable
-                        key={col}
-                        disabled={!tappable}
-                        onPress={() => pick(col)}
-                        style={[
-                          styles.tileCell,
-                          { width: colPitch, height: pitchY },
-                        ]}
-                      >
-                        <Tile
-                          sprite={t.sprite}
-                          opacity={t.opacity}
-                          size={tile}
-                          isActive={isActive}
-                          pulse={pulse}
-                          revealedTile={t.revealedTile}
-                        />
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                {/* columns 1..5: tiles */}
+                {Array.from({ length: COLS }, (_, col) => {
+                  const t = tileTypeFor(row, col);
+                  const tappable = isActive;
+                  return (
+                    <Pressable
+                      key={col}
+                      disabled={!tappable}
+                      onPress={() => pick(col)}
+                      style={[styles.cell, { width: pitch, height: pitchY }]}
+                    >
+                      <Tile
+                        sprite={t.sprite}
+                        opacity={t.opacity}
+                        size={tile}
+                        isActive={isActive}
+                        pulse={pulse}
+                        revealedTile={t.revealedTile}
+                      />
+                    </Pressable>
+                  );
+                })}
               </View>
             );
           })}
@@ -855,22 +864,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  pillWrap: { justifyContent: "center", alignItems: "flex-start" },
+  // every grid slot (pill column + 5 tile columns) is one identical square cell
+  cell: { alignItems: "center", justifyContent: "center" },
   pill: {
     backgroundColor: PALETTE.pillBg,
-    borderRadius: 15,
-    paddingHorizontal: 7,
+    borderRadius: 14,
+    paddingHorizontal: 4,
     height: 28,
-    minWidth: 54,
     alignItems: "center",
     justifyContent: "center",
   },
   pillActive: { backgroundColor: PALETTE.green },
-  pillText: { color: "#c9d6d2", fontSize: 10.5, fontFamily: "Inter_600SemiBold" },
+  pillText: { color: "#c9d6d2", fontSize: 10, fontFamily: "Inter_600SemiBold" },
   pillTextActive: { color: "#1c3500" },
-
-  tilesRow: { flex: 1, flexDirection: "row", alignItems: "center" },
-  tileCell: { alignItems: "center", justifyContent: "center" },
   tileShadow: {
     shadowColor: "#000",
     shadowOpacity: 0.06,
