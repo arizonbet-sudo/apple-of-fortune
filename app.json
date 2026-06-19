@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "5d6d271a-f5cb-4371-913d-6aa02e38528a"
+      }
+    },
+    "android": {
+      "package": "com.appleoffortune.game"
+    }
+  }
+}
