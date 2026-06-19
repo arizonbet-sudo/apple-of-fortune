@@ -12,6 +12,21 @@ reference screenshots (1080x2340). Keep the Uzbek UI text exactly as in the scre
 Sprites saved 160x160, circular-masked, in assets/images/: wood, sprout, apple, core, bg.
 Crop centers in the 1080-wide screenshots: WOOD (615,664); CORE (460,664);
 APPLE (280,985); SPROUT (615,1160). bg = jungle crop 1080x400+0+1610, stretched + blurred.
+DECISION: re-extracting sharper sprites is NOT worth it — tiles touch each other, so any
+crop catches neighbor slivers, and the existing 160px masks are already native-res. Improve
+perceived quality via rendering instead (expo-blur backdrop, tile drop-shadows, expo-image
+cross-dissolve transition to kill the black flash on source swap), not bigger source crops.
+
+## Board geometry (verified against a 100px grid overlay on the 1080-wide refs)
+PILL_COL ≈ width*0.135 (measured 0.134). colPitch = (width - 2*H_PAD - PILL_COL)/5.
+Tile diameter ≈ 0.98*colPitch (tiles nearly touch). Vertical pitchY ≈ 0.80*tile
+(~19% vertical overlap, NOT 28%). 7 of 9 rows visible. These are already correct in code.
+
+## Verifying the UI (screenshot gotcha)
+The app shows a ~1100ms branded loading overlay on mount that fades out. The screenshot
+tool RELOADS the page every call, so it always captures the loading screen at t=0 and never
+the game. Use the Playwright testing skill (runTest) to wait past the overlay and exercise
+the board/admin menu — that is the only reliable visual validation here.
 
 ## Design decisions
 - Tiles overlap vertically (~28%) but are spaced horizontally — this packed look is the

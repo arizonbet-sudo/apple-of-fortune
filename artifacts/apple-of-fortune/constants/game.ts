@@ -30,16 +30,45 @@ export const PALETTE = {
   headerStrip: "#2a2e2f",
   balancePill: "#1c1f20",
   orange: "#f5821f",
-  button: "#1f6259",
-  buttonDark: "#04303f",
+  button: "#1b5f72",
+  buttonDark: "#06303d",
   inputBg: "#04313f",
-  cashout: "#1f6259",
-  green: "#9bcb3b",
+  cashout: "#1b5f72",
+  green: "#a4d13c",
   greenDark: "#7fb01f",
   text: "#ffffff",
   textMuted: "#9bb0ac",
   pillBg: "#0c2b2a",
   bonus: "#1c1f20",
+};
+
+// ---- Admin / debug settings ----
+export const SETTINGS_KEY = "apple-of-fortune:settings:v1";
+
+export type Settings = {
+  playerName: string;
+  appName: string;
+  appLogoUri: string | null;
+  loadingLogoUri: string | null;
+  applePos: number; // -1 = off, else forced apple column (0..4) for active row
+  losePos: number; // -1 = off, else forced core column (0..4) for active row
+  winMode: boolean; // tapped tile is always safe
+  loseMode: boolean; // tapped tile is always a core
+  autoWin: boolean; // auto-play every round to the top (win)
+  autoLose: boolean; // auto-tap to lose immediately
+};
+
+export const DEFAULT_SETTINGS: Settings = {
+  playerName: "",
+  appName: "APPLE OF FORTUNE",
+  appLogoUri: null,
+  loadingLogoUri: null,
+  applePos: -1,
+  losePos: -1,
+  winMode: false,
+  loseMode: false,
+  autoWin: false,
+  autoLose: false,
 };
 
 export type CellType = "safe" | "core";

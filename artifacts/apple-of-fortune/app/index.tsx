@@ -1,7 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Pressable,
   StyleSheet,
@@ -10,6 +17,9 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  FadeIn,
+  FadeOut,
+  SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -18,7 +28,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AdminMenu } from "@/components/AdminMenu";
 import { useBalance } from "@/hooks/useBalance";
+import { useSettings } from "@/hooks/useSettings";
 import {
   CellType,
   COLS,
@@ -31,104 +43,122 @@ import {
   PALETTE,
   Phase,
   ROWS,
+  Settings,
   SPRITES,
   VISIBLE_ROWS,
 } from "@/constants/game";
 
-const AImage = Animated.createAnimatedComponent(Image);
+const APP_ICON = require("../assets/images/icon.png");
+
+type SpriteName = keyof typeof SPRITES;
 
 export default function AppleOfFortune() {
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const { balance, adjust, setBalance } = useBalance();
+  const { settings, set: setSetting, reset: resetSettings } = useSettings();
+  const settingsRef = useRef<Settings>(settings);
+  settingsRef.current = settings;
 
   const [phase, setPhase] = useState<Phase>("betting");
   const [bet, setBet] = useState(DEFAULT_BET);
   const [board, setBoard] = useState<CellType[][]>(() => generateBoard());
   const [currentRow, setCurrentRow] = useState(0);
   const [picks, setPicks] = useState<number[]>([]);
-  const [lostCell, setLostCell] = useState<{ row: number; col: number } | null>(
-    null,
-  );
   const [winAmount, setWinAmount] = useState(0);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [showLoading, setShowLoading] = useState(true);
+
+  useEffect(() => {
+    const id = setTimeout(() => setShowLoading(false), 1100);
+    return () => clearTimeout(id);
+  }, []);
 
   // ----- layout math (mirrors the 1080px reference grid) -----
   const H_PAD = 8;
   const PILL_COL = Math.round(width * 0.135);
   const tilesArea = width - H_PAD * 2 - PILL_COL;
   const colPitch = tilesArea / COLS;
-  const tile = colPitch * 0.94;
-  const pitchY = tile * 0.78; // tiles overlap vertically like the original
+  const tile = colPitch * 0.98;
+  const pitchY = tile * 0.8;
   const boardTop = insets.top + 96;
   const boardHeight = VISIBLE_ROWS * pitchY + (tile - pitchY);
 
-  // bottom visible row index (0..2): how far the rail has scrolled up
-  const bottomVisible = Math.max(0, Math.min(currentRow - 2, ROWS - VISIBLE_ROWS));
+  const bottomVisible = Math.max(
+    0,
+    Math.min(currentRow - 2, ROWS - VISIBLE_ROWS),
+  );
   const railY = (bottomVisible - 2) * pitchY;
   const scroll = useSharedValue(railY);
-
   useEffect(() => {
-    scroll.value = withTiming(railY, { duration: 280 });
+    scroll.value = withTiming(railY, { duration: 300 });
   }, [railY, scroll]);
-
   const railStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: scroll.value }],
   }));
 
-  // subtle pulse for active sprout row
+  // shared pulse for the active sprout row
   const pulse = useSharedValue(1);
   useEffect(() => {
     pulse.value = withRepeat(
       withSequence(
-        withTiming(1.05, { duration: 700 }),
-        withTiming(1, { duration: 700 }),
+        withTiming(1.05, { duration: 720 }),
+        withTiming(1, { duration: 720 }),
       ),
       -1,
       true,
     );
   }, [pulse]);
-  const pulseAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulse.value }],
-  }));
 
   const revealed = phase === "won" || phase === "lost";
   const playing = phase === "playing";
 
-  // lock that prevents a second handler from firing within the same frame /
-  // before React re-renders and disables the controls. Unlocks whenever the
-  // game advances to a new row or changes phase.
   const busyRef = useRef(false);
   useEffect(() => {
     busyRef.current = false;
   }, [currentRow, phase]);
 
-  const availableWin =
-    currentRow > 0 ? bet * MULTIPLIERS[currentRow - 1] : 0;
+  const availableWin = currentRow > 0 ? bet * MULTIPLIERS[currentRow - 1] : 0;
+
+  const decideSafe = useCallback(
+    (col: number, row: number, b: CellType[][]) => {
+      const s = settingsRef.current;
+      if (s.autoLose || s.loseMode) return false;
+      if (s.autoWin || s.winMode) return true;
+      if (col === s.applePos) return true;
+      if (col === s.losePos) return false;
+      return b[row][col] === "safe";
+    },
+    [],
+  );
 
   const startGame = useCallback(() => {
-    if (phase !== "betting" || busyRef.current) return;
+    if (phase === "playing" || busyRef.current) return;
     if (balance < bet || bet < MIN_BET) return;
     busyRef.current = true;
     adjust(-bet);
     setBoard(generateBoard());
     setPicks([]);
     setCurrentRow(0);
-    setLostCell(null);
     setWinAmount(0);
     setPhase("playing");
-  }, [adjust, balance, bet]);
+  }, [adjust, balance, bet, phase]);
 
   const pick = useCallback(
     (col: number) => {
       if (phase !== "playing" || busyRef.current) return;
       busyRef.current = true;
-      const cell = board[currentRow][col];
+
+      const safe = decideSafe(col, currentRow, board);
+      const nextBoard = board.map((r) => [...r]);
+      nextBoard[currentRow][col] = safe ? "safe" : "core";
+      setBoard(nextBoard);
+
       const nextPicks = [...picks];
       nextPicks[currentRow] = col;
       setPicks(nextPicks);
 
-      if (cell === "core") {
-        setLostCell({ row: currentRow, col });
+      if (!safe) {
         setPhase("lost");
         return;
       }
@@ -143,8 +173,16 @@ export default function AppleOfFortune() {
         setCurrentRow(next);
       }
     },
-    [adjust, bet, board, currentRow, phase, picks],
+    [adjust, bet, board, currentRow, decideSafe, phase, picks],
   );
+
+  // auto win / auto lose driver
+  useEffect(() => {
+    if (phase !== "playing") return;
+    if (!settings.autoWin && !settings.autoLose) return;
+    const id = setTimeout(() => pick(0), 600);
+    return () => clearTimeout(id);
+  }, [phase, currentRow, settings.autoWin, settings.autoLose, pick]);
 
   const cashOut = useCallback(() => {
     if (!playing || currentRow === 0 || busyRef.current) return;
@@ -159,8 +197,6 @@ export default function AppleOfFortune() {
     busyRef.current = true;
     setCurrentRow(0);
     setPicks([]);
-    setLostCell(null);
-    // immediately re-bet the same amount
     if (balance >= bet && bet >= MIN_BET) {
       adjust(-bet);
       setBoard(generateBoard());
@@ -174,7 +210,6 @@ export default function AppleOfFortune() {
     setPhase("betting");
     setCurrentRow(0);
     setPicks([]);
-    setLostCell(null);
   }, []);
 
   const changeBet = useCallback(
@@ -193,35 +228,82 @@ export default function AppleOfFortune() {
     [balance, phase],
   );
 
+  const setBetAdmin = useCallback(
+    (n: number) => {
+      const clamped = Math.max(MIN_BET, Math.min(n, MAX_BET));
+      setBet(Math.round(clamped));
+    },
+    [],
+  );
+
+  const fullReset = useCallback(() => {
+    resetSettings();
+    setBalance(1000000);
+    setBet(DEFAULT_BET);
+    setPhase("betting");
+    setCurrentRow(0);
+    setPicks([]);
+    setWinAmount(0);
+    setBoard(generateBoard());
+  }, [resetSettings, setBalance]);
+
   const tileTypeFor = (
     row: number,
     col: number,
-  ): { sprite: keyof typeof SPRITES; opacity: number } => {
+  ): { sprite: SpriteName; opacity: number; revealedTile: boolean } => {
     if (revealed) {
       const isCore = board[row][col] === "core";
-      return { sprite: isCore ? "core" : "apple", opacity: 1 };
+      return {
+        sprite: isCore ? "core" : "apple",
+        opacity: 1,
+        revealedTile: true,
+      };
     }
     if (row < currentRow) {
-      if (picks[row] === col) return { sprite: "apple", opacity: 1 };
-      return { sprite: "wood", opacity: 0.4 };
+      if (picks[row] === col)
+        return { sprite: "apple", opacity: 1, revealedTile: true };
+      return { sprite: "wood", opacity: 0.4, revealedTile: false };
     }
     if (row === currentRow) {
-      return { sprite: "sprout", opacity: 1 };
+      return { sprite: "sprout", opacity: 1, revealedTile: false };
     }
     const dist = row - currentRow;
-    return { sprite: "wood", opacity: dist <= 2 ? 0.92 : 0.42 };
+    return {
+      sprite: "wood",
+      opacity: dist <= 2 ? 0.92 : 0.42,
+      revealedTile: false,
+    };
   };
 
-  // render rows from top (8) to bottom (0) so lower rows paint in front
+  // render rows from top down so lower rows paint in front
   const rowIndexes = useMemo(
     () => Array.from({ length: ROWS }, (_, i) => ROWS - 1 - i),
     [],
   );
 
+  const cheatActive =
+    settings.winMode ||
+    settings.loseMode ||
+    settings.autoWin ||
+    settings.autoLose ||
+    settings.applePos >= 0 ||
+    settings.losePos >= 0;
+
+  const canBet = balance >= bet && bet >= MIN_BET;
+
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <Image source={SPRITES.bg} style={StyleSheet.absoluteFill} contentFit="cover" />
+      <Image
+        source={SPRITES.bg}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+      />
+      <BlurView
+        intensity={18}
+        tint="dark"
+        style={StyleSheet.absoluteFill}
+      />
       <View style={[StyleSheet.absoluteFill, styles.bgTint]} />
 
       {/* ---------- Header ---------- */}
@@ -241,15 +323,35 @@ export default function AppleOfFortune() {
           </View>
         </View>
 
-        <View style={styles.bonusBadge}>
-          <Text style={styles.bonusText}>BONUS</Text>
-        </View>
+        <Pressable
+          hitSlop={8}
+          onPress={() => setAdminOpen(true)}
+          style={[styles.bonusBadge, cheatActive && styles.bonusBadgeActive]}
+        >
+          <Text
+            style={[styles.bonusText, cheatActive && styles.bonusTextActive]}
+          >
+            BONUS
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.titleRow}>
-        <Text style={styles.title}>APPLE OF FORTUNE</Text>
+        {settings.appLogoUri ? (
+          <Image
+            source={{ uri: settings.appLogoUri }}
+            style={styles.titleLogo}
+            contentFit="contain"
+          />
+        ) : (
+          <Text style={styles.title}>{settings.appName}</Text>
+        )}
         <View style={styles.infoIcon}>
-          <Ionicons name="information-circle-outline" size={22} color="#cfd8d6" />
+          <Ionicons
+            name="information-circle-outline"
+            size={22}
+            color="#cfd8d6"
+          />
         </View>
       </View>
 
@@ -262,24 +364,16 @@ export default function AppleOfFortune() {
       >
         <Animated.View style={[styles.rail, railStyle]}>
           {rowIndexes.map((row) => {
-            const railTop = (ROWS - 1 - row) * pitchY - (tile - pitchY) / 2;
-            const isActive = row === currentRow && !revealed;
+            const railTop = (ROWS - 1 - row) * pitchY;
+            const isActive = row === currentRow && playing;
+            const showMultiplier = phase !== "betting";
             return (
               <View
                 key={row}
-                style={[
-                  styles.rowAbs,
-                  { top: railTop + (tile - pitchY) / 2, height: pitchY },
-                ]}
+                style={[styles.rowAbs, { top: railTop, height: pitchY }]}
               >
-                {/* multiplier pill */}
                 <View style={[styles.pillWrap, { width: PILL_COL }]}>
-                  <View
-                    style={[
-                      styles.pill,
-                      isActive && styles.pillActive,
-                    ]}
-                  >
+                  <View style={[styles.pill, isActive && styles.pillActive]}>
                     <Text
                       style={[
                         styles.pillText,
@@ -287,16 +381,15 @@ export default function AppleOfFortune() {
                       ]}
                       numberOfLines={1}
                     >
-                      {phase === "betting" ? "" : `x ${MULTIPLIERS[row].toFixed(2)}`}
+                      {showMultiplier ? `x ${MULTIPLIERS[row].toFixed(2)}` : ""}
                     </Text>
                   </View>
                 </View>
 
-                {/* tiles */}
                 <View style={styles.tilesRow}>
                   {Array.from({ length: COLS }, (_, col) => {
                     const t = tileTypeFor(row, col);
-                    const tappable = isActive && playing;
+                    const tappable = isActive;
                     return (
                       <Pressable
                         key={col}
@@ -307,17 +400,13 @@ export default function AppleOfFortune() {
                           { width: colPitch, height: pitchY },
                         ]}
                       >
-                        <AImage
-                          source={SPRITES[t.sprite]}
-                          contentFit="contain"
-                          style={[
-                            {
-                              width: tile,
-                              height: tile,
-                              opacity: t.opacity,
-                            },
-                            isActive && pulseAnimStyle,
-                          ]}
+                        <Tile
+                          sprite={t.sprite}
+                          opacity={t.opacity}
+                          size={tile}
+                          isActive={isActive}
+                          pulse={pulse}
+                          revealedTile={t.revealedTile}
                         />
                       </Pressable>
                     );
@@ -328,45 +417,155 @@ export default function AppleOfFortune() {
           })}
         </Animated.View>
 
-        {/* overlay messages */}
         {phase === "lost" && (
-          <View pointerEvents="none" style={styles.overlay}>
+          <Animated.View
+            entering={FadeIn.duration(260)}
+            exiting={FadeOut.duration(260)}
+            pointerEvents="none"
+            style={styles.overlay}
+          >
             <Text style={styles.loseTitle}>Omadsizlik</Text>
             <Text style={styles.loseSub}>yana bir bor urinib ko`ring</Text>
-          </View>
+          </Animated.View>
         )}
         {phase === "won" && (
-          <View pointerEvents="none" style={styles.overlay}>
+          <Animated.View
+            entering={FadeIn.duration(260)}
+            exiting={FadeOut.duration(260)}
+            pointerEvents="none"
+            style={styles.overlay}
+          >
             <Text style={styles.winTitle}>G'alaba!</Text>
             <Text style={styles.winSub}>
               Yutug'ingiz {formatMoney(winAmount)} сўм
             </Text>
-          </View>
+          </Animated.View>
         )}
       </View>
 
       {/* ---------- Footer ---------- */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 8 }]}>
         {phase === "betting" && (
-          <BettingControls
-            bet={bet}
-            onChange={changeBet}
-            onBet={startGame}
-            canBet={balance >= bet && bet >= MIN_BET}
-          />
+          <Animated.View
+            key="betting"
+            entering={FadeIn.duration(280)}
+            exiting={FadeOut.duration(280)}
+          >
+            <BettingControls
+              bet={bet}
+              onChange={changeBet}
+              onBet={startGame}
+              onSettings={() => setAdminOpen(true)}
+              onOneClick={startGame}
+              canBet={canBet}
+            />
+          </Animated.View>
         )}
         {phase === "playing" && (
-          <PlayingControls
-            available={availableWin}
-            canCash={currentRow > 0}
-            onCash={cashOut}
-          />
+          <Animated.View
+            key="playing"
+            entering={FadeIn.duration(280)}
+            exiting={FadeOut.duration(420)}
+          >
+            <PlayingControls
+              available={availableWin}
+              canCash={currentRow > 0}
+              onCash={cashOut}
+            />
+          </Animated.View>
         )}
         {(phase === "lost" || phase === "won") && (
-          <EndControls bet={bet} onAgain={playAgain} onNew={newBet} />
+          <Animated.View
+            key="end"
+            entering={FadeIn.duration(340).delay(120)}
+            exiting={FadeOut.duration(280)}
+          >
+            <EndControls bet={bet} onAgain={playAgain} onNew={newBet} />
+          </Animated.View>
         )}
       </View>
+
+      <AdminMenu
+        visible={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        settings={settings}
+        setSetting={setSetting}
+        balance={balance}
+        setBalance={setBalance}
+        bet={bet}
+        setBet={setBetAdmin}
+        onReset={fullReset}
+      />
+
+      {showLoading && (
+        <Animated.View exiting={FadeOut.duration(450)} style={styles.loading}>
+          <Image
+            source={settings.loadingLogoUri ? { uri: settings.loadingLogoUri } : APP_ICON}
+            style={styles.loadingLogo}
+            contentFit="contain"
+          />
+          <Text style={styles.loadingText}>{settings.appName}</Text>
+        </Animated.View>
+      )}
     </View>
+  );
+}
+
+/* ---------------- Tile ---------------- */
+
+function Tile({
+  sprite,
+  opacity,
+  size,
+  isActive,
+  pulse,
+  revealedTile,
+}: {
+  sprite: SpriteName;
+  opacity: number;
+  size: number;
+  isActive: boolean;
+  pulse: SharedValue<number>;
+  revealedTile: boolean;
+}) {
+  const reveal = useSharedValue(1);
+  const op = useSharedValue(opacity);
+  const prevSprite = useRef(sprite);
+
+  useEffect(() => {
+    op.value = withTiming(opacity, { duration: 220 });
+  }, [opacity, op]);
+
+  useEffect(() => {
+    if (prevSprite.current !== sprite) {
+      prevSprite.current = sprite;
+      if (revealedTile) {
+        reveal.value = withSequence(
+          withTiming(0.82, { duration: 90 }),
+          withTiming(1.1, { duration: 130 }),
+          withTiming(1, { duration: 110 }),
+        );
+      }
+    }
+  }, [sprite, revealedTile, reveal]);
+
+  const aStyle = useAnimatedStyle(
+    () => ({
+      opacity: op.value,
+      transform: [{ scale: isActive ? pulse.value : reveal.value }],
+    }),
+    [isActive],
+  );
+
+  return (
+    <Animated.View style={[styles.tileShadow, aStyle]}>
+      <Image
+        source={SPRITES[sprite]}
+        contentFit="contain"
+        transition={{ duration: 240, effect: "cross-dissolve" }}
+        style={{ width: size, height: size }}
+      />
+    </Animated.View>
   );
 }
 
@@ -388,7 +587,6 @@ function PopValue({
       first.current = false;
       return;
     }
-    // numbers jump straight to the final value with a subtle pop, no counting
     scale.value = withSequence(
       withTiming(1.16, { duration: 110 }),
       withTiming(1, { duration: 150 }),
@@ -410,27 +608,33 @@ function BettingControls({
   bet,
   onChange,
   onBet,
+  onSettings,
+  onOneClick,
   canBet,
 }: {
   bet: number;
   onChange: (m: "min" | "x2" | "half" | "max") => void;
   onBet: () => void;
+  onSettings: () => void;
+  onOneClick: () => void;
   canBet: boolean;
 }) {
+  const atMin = bet <= MIN_BET;
+  const atMax = bet >= MAX_BET;
+  const adjustButtons = [
+    ["MIN", "min", atMin],
+    ["X2", "x2", atMax],
+    ["X/2", "half", atMin],
+    ["MAX", "max", atMax],
+  ] as const;
   return (
     <View>
       <View style={styles.adjustRow}>
-        {(
-          [
-            ["MIN", "min"],
-            ["X2", "x2"],
-            ["X/2", "half"],
-            ["MAX", "max"],
-          ] as const
-        ).map(([label, mode]) => (
+        {adjustButtons.map(([label, mode, disabled]) => (
           <Pressable
             key={mode}
-            style={styles.adjustBtn}
+            style={[styles.adjustBtn, disabled && styles.disabled]}
+            disabled={disabled}
             onPress={() => onChange(mode)}
           >
             <Text style={styles.adjustText}>{label}</Text>
@@ -455,14 +659,18 @@ function BettingControls({
       </Text>
 
       <View style={styles.tabRow}>
-        <View style={styles.tab}>
+        <Pressable style={styles.tab} onPress={onSettings}>
           <Ionicons name="settings-sharp" size={16} color="#cfd8d6" />
           <Text style={styles.tabText}>SOZLASH</Text>
-        </View>
-        <View style={styles.tab}>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, !canBet && styles.disabled]}
+          disabled={!canBet}
+          onPress={onOneClick}
+        >
           <Ionicons name="flash" size={16} color="#cfd8d6" />
           <Text style={styles.tabText}>BIR BOSISHDA</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -479,13 +687,10 @@ function PlayingControls({
 }) {
   return (
     <View>
-      <View style={styles.winInfoRow}>
-        <Text style={styles.winInfoLabel}>MAVJUD YUTUQ</Text>
-        <PopValue
-          value={available}
-          format={(n) => `${formatMoney(n)} сўм`}
-          style={styles.winInfoValue}
-        />
+      <View style={styles.winInfoBar}>
+        <Text style={styles.winInfoText}>
+          MAVJUD YUTUQ: {formatMoney(available)} сўм
+        </Text>
       </View>
       <Pressable
         style={[styles.cashBtn, !canCash && styles.disabled]}
@@ -523,7 +728,7 @@ function EndControls({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0c2b27" },
-  bgTint: { backgroundColor: "rgba(8,30,28,0.35)" },
+  bgTint: { backgroundColor: "rgba(8,30,28,0.32)" },
 
   headerStrip: {
     backgroundColor: PALETTE.headerStrip,
@@ -568,7 +773,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  bonusBadgeActive: { borderColor: PALETTE.green, borderStyle: "solid" },
   bonusText: { color: "#d9a441", fontSize: 7, fontFamily: "Inter_700Bold" },
+  bonusTextActive: { color: PALETTE.green },
 
   titleRow: {
     flexDirection: "row",
@@ -582,6 +789,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     letterSpacing: 1,
   },
+  titleLogo: { height: 30, width: 160 },
   infoIcon: { position: "absolute", right: 16 },
 
   board: { position: "absolute", left: 0, right: 0, overflow: "hidden" },
@@ -609,8 +817,19 @@ const styles = StyleSheet.create({
 
   tilesRow: { flex: 1, flexDirection: "row", alignItems: "center" },
   tileCell: { alignItems: "center", justifyContent: "center" },
+  tileShadow: {
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
 
-  overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   loseTitle: {
     color: "#fff",
     fontSize: 34,
@@ -618,7 +837,12 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.6)",
     textShadowRadius: 8,
   },
-  loseSub: { color: "#e6ece9", fontSize: 14, fontFamily: "Inter_500Medium", marginTop: 4 },
+  loseSub: {
+    color: "#e6ece9",
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    marginTop: 4,
+  },
   winTitle: {
     color: PALETTE.green,
     fontSize: 36,
@@ -626,7 +850,12 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.6)",
     textShadowRadius: 8,
   },
-  winSub: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold", marginTop: 4 },
+  winSub: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    marginTop: 4,
+  },
 
   footer: {
     position: "absolute",
@@ -664,7 +893,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   garovText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-  disabled: { opacity: 0.45 },
+  disabled: { opacity: 0.4 },
   limitText: {
     color: PALETTE.textMuted,
     fontSize: 11,
@@ -683,25 +912,22 @@ const styles = StyleSheet.create({
   tab: { flexDirection: "row", alignItems: "center", gap: 6 },
   tabText: { color: "#cfd8d6", fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
-  winInfoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  winInfoBar: {
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: PALETTE.inputBg,
     borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     marginBottom: 8,
   },
-  winInfoLabel: { color: PALETTE.textMuted, fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  winInfoValue: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
+  winInfoText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
   cashBtn: {
-    backgroundColor: PALETTE.green,
+    backgroundColor: PALETTE.button,
     borderRadius: 8,
     paddingVertical: 15,
     alignItems: "center",
   },
-  cashText: { color: "#1c3500", fontSize: 16, fontFamily: "Inter_700Bold" },
+  cashText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
 
   againBtn: {
     backgroundColor: PALETTE.button,
@@ -720,4 +946,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   newText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+
+  loading: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0c2b27",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 18,
+  },
+  loadingLogo: { width: 120, height: 120, borderRadius: 24 },
+  loadingText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 1,
+  },
 });
