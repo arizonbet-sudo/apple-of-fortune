@@ -34,7 +34,7 @@ import { useSettings } from "@/hooks/useSettings";
 import {
   CellType,
   COLS,
-  DEFAULT_BET,
+  DEFAULT_BALANCE,
   formatMoney,
   generateBoard,
   MAX_BET,
@@ -61,13 +61,24 @@ export default function AppleOfFortune() {
   settingsRef.current = settings;
 
   const [phase, setPhase] = useState<Phase>("betting");
-  const [bet, setBet] = useState(DEFAULT_BET);
   const [board, setBoard] = useState<CellType[][]>(() => generateBoard());
   const [currentRow, setCurrentRow] = useState(0);
   const [picks, setPicks] = useState<number[]>([]);
   const [winAmount, setWinAmount] = useState(0);
   const [adminOpen, setAdminOpen] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
+  // when a round ends, keep "Current win + Collect" on screen briefly, then fade
+  const [endHold, setEndHold] = useState(false);
+
+  // bet amount is persisted with the rest of the admin settings
+  const bet = settings.bet;
+  const updateBet = useCallback(
+    (n: number) => {
+      const clamped = Math.max(MIN_BET, Math.min(Math.round(n), MAX_BET));
+      setSetting("bet", clamped);
+    },
+    [setSetting],
+  );
 
   useEffect(() => {
     const id = setTimeout(() => setShowLoading(false), 1100);
@@ -136,6 +147,7 @@ export default function AppleOfFortune() {
     if (phase === "playing" || busyRef.current) return;
     if (balance < bet || bet < MIN_BET) return;
     busyRef.current = true;
+    setEndHold(false);
     adjust(-bet);
     setBoard(generateBoard());
     setPicks([]);
@@ -184,6 +196,14 @@ export default function AppleOfFortune() {
     return () => clearTimeout(id);
   }, [phase, currentRow, settings.autoWin, settings.autoLose, pick]);
 
+  // on round end keep "Current win + Collect" visible ~450ms, then fade to end controls
+  useEffect(() => {
+    if (phase !== "won" && phase !== "lost") return;
+    setEndHold(true);
+    const id = setTimeout(() => setEndHold(false), 450);
+    return () => clearTimeout(id);
+  }, [phase]);
+
   const cashOut = useCallback(() => {
     if (!playing || currentRow === 0 || busyRef.current) return;
     busyRef.current = true;
@@ -195,6 +215,7 @@ export default function AppleOfFortune() {
   const playAgain = useCallback(() => {
     if (busyRef.current) return;
     busyRef.current = true;
+    setEndHold(false);
     setCurrentRow(0);
     setPicks([]);
     if (balance >= bet && bet >= MIN_BET) {
@@ -207,6 +228,7 @@ export default function AppleOfFortune() {
   }, [adjust, balance, bet]);
 
   const newBet = useCallback(() => {
+    setEndHold(false);
     setPhase("betting");
     setCurrentRow(0);
     setPicks([]);
@@ -215,31 +237,21 @@ export default function AppleOfFortune() {
   const changeBet = useCallback(
     (mode: "min" | "x2" | "half" | "max") => {
       if (phase === "playing") return;
-      setBet((prev) => {
-        let next = prev;
-        if (mode === "min") next = MIN_BET;
-        else if (mode === "x2") next = prev * 2;
-        else if (mode === "half") next = prev / 2;
-        else if (mode === "max") next = Math.min(balance, MAX_BET);
-        next = Math.max(MIN_BET, Math.min(next, MAX_BET, balance || MAX_BET));
-        return Math.round(next);
-      });
+      let next = bet;
+      if (mode === "min") next = MIN_BET;
+      else if (mode === "x2") next = bet * 2;
+      else if (mode === "half") next = bet / 2;
+      else if (mode === "max") next = Math.min(balance, MAX_BET);
+      next = Math.min(next, balance || MAX_BET);
+      updateBet(next);
     },
-    [balance, phase],
-  );
-
-  const setBetAdmin = useCallback(
-    (n: number) => {
-      const clamped = Math.max(MIN_BET, Math.min(n, MAX_BET));
-      setBet(Math.round(clamped));
-    },
-    [],
+    [balance, bet, phase, updateBet],
   );
 
   const fullReset = useCallback(() => {
     resetSettings();
-    setBalance(1000000);
-    setBet(DEFAULT_BET);
+    setBalance(DEFAULT_BALANCE);
+    setEndHold(false);
     setPhase("betting");
     setCurrentRow(0);
     setPicks([]);
@@ -337,15 +349,22 @@ export default function AppleOfFortune() {
       </View>
 
       <View style={styles.titleRow}>
-        {settings.appLogoUri ? (
-          <Image
-            source={{ uri: settings.appLogoUri }}
-            style={styles.titleLogo}
-            contentFit="contain"
-          />
-        ) : (
-          <Text style={styles.title}>{settings.appName}</Text>
-        )}
+        <View style={styles.titleCenter}>
+          {settings.appLogoUri ? (
+            <Image
+              source={{ uri: settings.appLogoUri }}
+              style={styles.titleLogo}
+              contentFit="contain"
+            />
+          ) : (
+            <Text style={styles.title}>{settings.appName}</Text>
+          )}
+          {settings.playerName.trim().length > 0 && (
+            <Text style={styles.playerName} numberOfLines={1}>
+              {settings.playerName.trim()}
+            </Text>
+          )}
+        </View>
         <View style={styles.infoIcon}>
           <Ionicons
             name="information-circle-outline"
@@ -461,23 +480,23 @@ export default function AppleOfFortune() {
             />
           </Animated.View>
         )}
-        {phase === "playing" && (
+        {(phase === "playing" || endHold) && (
           <Animated.View
             key="playing"
             entering={FadeIn.duration(280)}
             exiting={FadeOut.duration(420)}
           >
             <PlayingControls
-              available={availableWin}
-              canCash={currentRow > 0}
+              available={phase === "won" ? winAmount : availableWin}
+              canCash={playing && currentRow > 0}
               onCash={cashOut}
             />
           </Animated.View>
         )}
-        {(phase === "lost" || phase === "won") && (
+        {(phase === "lost" || phase === "won") && !endHold && (
           <Animated.View
             key="end"
-            entering={FadeIn.duration(340).delay(120)}
+            entering={FadeIn.duration(340)}
             exiting={FadeOut.duration(280)}
           >
             <EndControls bet={bet} onAgain={playAgain} onNew={newBet} />
@@ -493,7 +512,7 @@ export default function AppleOfFortune() {
         balance={balance}
         setBalance={setBalance}
         bet={bet}
-        setBet={setBetAdmin}
+        setBet={updateBet}
         onReset={fullReset}
       />
 
@@ -783,11 +802,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 12,
   },
+  titleCenter: { alignItems: "center", justifyContent: "center" },
   title: {
     color: "#fff",
     fontFamily: "Inter_700Bold",
     fontSize: 16,
     letterSpacing: 1,
+  },
+  playerName: {
+    color: PALETTE.textMuted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    marginTop: 3,
   },
   titleLogo: { height: 30, width: 160 },
   infoIcon: { position: "absolute", right: 16 },

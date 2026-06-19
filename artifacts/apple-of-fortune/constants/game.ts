@@ -46,6 +46,7 @@ export const PALETTE = {
 export const SETTINGS_KEY = "apple-of-fortune:settings:v1";
 
 export type Settings = {
+  bet: number;
   playerName: string;
   appName: string;
   appLogoUri: string | null;
@@ -59,6 +60,7 @@ export type Settings = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
+  bet: DEFAULT_BET,
   playerName: "",
   appName: "APPLE OF FORTUNE",
   appLogoUri: null,
