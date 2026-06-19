@@ -41,6 +41,21 @@ reached) rows are FULL brightness in the reference, so they must be ~1.0, NOT di
 A stale 0.72 dimming on far upcoming rows (tuned for the old dark sprite) made the board look
 dark — fixed to dist<=2?1:0.9. Re-check this whenever sprite brightness changes.
 
+## Board vertical position / top-spacing calibration (visual)
+The whole grid's vertical placement is ONE value: `boardTop = insets.top + OFFSET` in
+index.tsx layout math. Tile-top on screen = boardTop + (pitchY-tile)/2 (~4 device px), and
+in any game state the row sitting at the board-container top is at that same screen Y (the
+container is fixed; only the inner rail scrolls). To match the reference's top spacing use the
+STATUS-BAR-INDEPENDENT title->first-row gap (web preview has no status bar; the reference
+phone screenshot does, ~94 ref px ≈ 35 device px — do NOT match absolute Y or you'll be off by
+the status bar): measure title-bottom and topmost-tile-top in the reference (1080x2340),
+gap_ref px × (deviceWidth/1080) = gap_device, then set OFFSET so on-screen
+(tiletop - title_bottom) == gap_device. Device viewport ~402x874 is ~same aspect as the ref
+(0.46), so width-scale ≈ height-scale ≈ 0.372. Measured ref: title-bottom y≈322,
+first-row tile-top y≈566 -> gap 244 ref ≈ 91 device; OFFSET 116 was too high, 170 matches.
+Measure edges programmatically from a saved screenshot (screenshot tool save_to) — per-row
+gray-brightness profile for the title band, wood-color threshold (R>110 & G<110) for tile top.
+
 ## Verifying the UI (screenshot gotcha)
 The app shows a ~1100ms branded loading overlay on mount that fades out. The screenshot
 tool RELOADS the page every call, so it always captures the loading screen at t=0 and never

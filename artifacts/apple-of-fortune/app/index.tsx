@@ -101,7 +101,7 @@ export default function AppleOfFortune() {
   // vertical pitch larger than the tile so rows are separated by a small gap (no overlap)
   const pitchY = tile * 1.15;
   // nudge the whole board down a touch so high multipliers don't crowd the top
-  const boardTop = insets.top + 116;
+  const boardTop = insets.top + 170;
   const boardHeight = VISIBLE_ROWS * pitchY + (tile - pitchY);
 
   const bottomVisible = Math.max(
