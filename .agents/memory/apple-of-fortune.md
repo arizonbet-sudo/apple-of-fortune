@@ -9,19 +9,23 @@ Multiplier-ladder gambling clone, virtual currency only, no backend. Built from 
 reference screenshots (1080x2340). Keep the Uzbek UI text exactly as in the screenshots.
 
 ## Sprite source crops (NOT derivable from code — needed to re-extract)
-Sprites saved 160x160, circular-masked (alpha 0 outside a radius-~79 circle), in
-assets/images/: wood, sprout, apple, core, bg. The current apple/wood/sprout were
-re-extracted from the OPEN-board reference Screenshot_20260619_125823 (1080x2340),
-which is the most faithful source because tiles there do NOT touch — clean per-tile crops.
-160x160 crop centers in that screenshot: APPLE (450,667) [x69.93 col2];
-WOOD (637,667) [x69.93 col3]; SPROUT/mushroom (637,451) [top row col3].
-Extraction: crop 160x160 centered, then CopyOpacity with a white circle (radius ~79) mask.
-core: kept the original eaten-apple-core sprite, warm/brightened (modulate 112,118,99) to
-sit with the new warmer wood. bg: original jungle bg.png brightened (modulate 110,107,100).
-DECISION (UPDATED): extracting straight from the target reference makes tile colors
-pixel-exact BY CONSTRUCTION — far better than code tints/overlays, which can only
-uniformly lighten/darken and CANNOT fix per-color hue/saturation. The earlier "not worth
-re-extracting" note applied only to the OLD refs where tiles touched.
+Sprites saved 160x160, circular-masked (alpha 0 outside a radius-~79 circle, feather 0.6) in
+assets/images/: wood, sprout, apple, core, bg. Extract from the target reference (1080x2340),
+crop 160x160 centered on a tile, then CopyOpacity with a white circle (radius 79) mask.
+CRITICAL PITFALL (this is what made an earlier pass look "dark/muddy with a green cast"):
+the climbed-board screenshot dims PAST/already-passed tiles to ~60% brightness, so cropping
+wood from there yields dark muddy tiles. ALWAYS crop each sprite from a FULL-BRIGHTNESS,
+UNOBSCURED instance, and sample the crop's center color to verify before installing —
+bright wood center is ~srgb(135,57,30); the dimmed/wrong one is ~srgb(80,46,26).
+Good full-brightness sources & centers:
+- WOOD <- the LOW-progress screenshot (e.g. ...125812..., top UNOPENED rows), center ~(637,667).
+- APPLE+green tile+leaf <- a fully-lit picked apple in the climbed screenshot (...125823...), ~(450,667).
+- SPROUT/mushroom <- top mushroom row of ...125823..., center ~(457,462) (cleanest, no green rim).
+- CORE: no clean reference instance — rebuild = bright WOOD ring + git-original eaten-apple-core
+  center (brighten orig core modulate ~122,108,100; composite via feathered circle r~40).
+- bg: the git-original jungle bg.png (do NOT re-grade it; revert any modulate).
+DECISION: extracting straight from the reference makes tile colors pixel-exact BY CONSTRUCTION;
+code tints/overlays only uniformly lighten/darken and CANNOT fix per-color hue/saturation.
 
 ## Board geometry (corrected against the user's original-game screenshots)
 PILL_COL ≈ width*0.142. colPitch = (width - 2*H_PAD - PILL_COL - COL_GAP)/5.
@@ -29,6 +33,13 @@ The original board is OPEN: tiles do NOT touch. Tile diameter ≈ 0.89*colPitch 
 horizontal gap) and crucially the VERTICAL pitch is LARGER than the tile —
 pitchY slightly LARGER than the tile (small gap between rows, NO overlap). 7 of 9 rows
 visible. Do NOT pack rows so they touch/overlap — that reads as cramped and is wrong.
+
+## Per-row tile opacity must match the reference's dimming (visual)
+In tileTypeFor: PAST already-climbed unpicked rows render dimmed — opacity 0.6 is CORRECT
+because the reference's dimmed wood ≈ bright wood × 0.6 (measured). But UPCOMING (not-yet-
+reached) rows are FULL brightness in the reference, so they must be ~1.0, NOT dimmed.
+A stale 0.72 dimming on far upcoming rows (tuned for the old dark sprite) made the board look
+dark — fixed to dist<=2?1:0.9. Re-check this whenever sprite brightness changes.
 
 ## Verifying the UI (screenshot gotcha)
 The app shows a ~1100ms branded loading overlay on mount that fades out. The screenshot

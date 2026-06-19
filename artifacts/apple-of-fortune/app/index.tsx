@@ -291,7 +291,7 @@ export default function AppleOfFortune() {
     const dist = row - currentRow;
     return {
       sprite: "wood",
-      opacity: dist <= 2 ? 0.97 : 0.72,
+      opacity: dist <= 2 ? 1 : 0.9,
       revealedTile: false,
     };
   };
@@ -773,7 +773,7 @@ function EndControls({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0c2b27" },
-  bgTint: { backgroundColor: "rgba(7,28,30,0.06)" },
+  bgTint: { backgroundColor: "rgba(0,0,0,0.05)" },
 
   headerStrip: {
     backgroundColor: PALETTE.headerStrip,
@@ -871,7 +871,7 @@ const styles = StyleSheet.create({
   tileCell: { alignItems: "center", justifyContent: "center" },
   tileShadow: {
     shadowColor: "#000",
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
