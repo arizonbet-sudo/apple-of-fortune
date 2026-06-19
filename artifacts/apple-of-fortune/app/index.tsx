@@ -90,23 +90,23 @@ export default function AppleOfFortune() {
   }, []);
 
   // ----- master grid -----
-  // ONE uniform, centered grid derived by measuring the 1080px original:
-  //   - 6 columns = 1 multiplier pill + 5 tile columns
-  //   - tile & pill diameter = 147 ref px
-  //   - column pitch = 169 ref px, row pitch = 170 ref px (identical -> square)
-  // Every tile/pill sits on this single pitch so spacing is identical across
-  // all rows and columns with no per-row drift.
+  // ONE uniform grid (6 columns = 1 multiplier pill + 5 tile columns).
+  // Measured 1:1 from the 1080px original screenshot:
+  //   - column pitch 168, row pitch 166.5 (ref px)
+  //   - disc diameter ~164 -> tiles nearly touch (gap ~4), tile box = pitch
+  //   - tile col centers 281/452/621/790/954 -> gridLeft = 281 - 1.5*pitch = 29
+  //   - pill (col 0) 140x66, centered in its cell
   const REF_W = 1080;
   const gridScale = width / REF_W;
-  const tile = 147 * gridScale; // tile + pill diameter
-  const pitch = 169.5 * gridScale; // one pitch for BOTH axes (square grid)
-  const pitchY = pitch;
+  const pitch = 168 * gridScale; // column pitch
+  const pitchY = 166.5 * gridScale; // row pitch
+  const tile = 168 * gridScale; // disc cell box (masked sprite fills ~0.976)
+  const pillW = 140 * gridScale;
+  const pillH = 66 * gridScale;
   const GRID_COLS = COLS + 1; // pill column + 5 tile columns
-  // center the whole 6-column strip horizontally (perfectly centered)
-  const gridLeft = (width - GRID_COLS * pitch) / 2;
-  // board Y derived from the reference: title-center -> top-row-center gap
-  // 177 ref px -> ~66 device px; keeps a large jungle gap before the win panel.
-  const boardTop = insets.top + 121;
+  const gridLeft = 29 * gridScale; // matches measured tile column centers
+  // title-center -> first-row-center gap = 166 ref px (~62 device px)
+  const boardTop = insets.top + 104;
   const boardHeight = VISIBLE_ROWS * pitchY + (tile - pitchY);
 
   const bottomVisible = Math.max(
@@ -293,10 +293,9 @@ export default function AppleOfFortune() {
     if (row === currentRow) {
       return { sprite: "sprout", opacity: 1, revealedTile: false };
     }
-    const dist = row - currentRow;
     return {
       sprite: "wood",
-      opacity: dist <= 2 ? 1 : 0.9,
+      opacity: 1,
       revealedTile: false,
     };
   };
@@ -413,7 +412,7 @@ export default function AppleOfFortune() {
                   <View
                     style={[
                       styles.pill,
-                      { width: tile },
+                      { width: pillW, height: pillH, borderRadius: pillH / 2 },
                       isActive && styles.pillActive,
                     ]}
                   >

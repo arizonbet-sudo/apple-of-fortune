@@ -5,106 +5,75 @@ description: Non-obvious sprite-extraction coords and design decisions for the A
 
 # Apple of Fortune (artifacts/apple-of-fortune)
 
-Multiplier-ladder gambling clone, virtual currency only, no backend. Built from 12
+Multiplier-ladder gambling clone, virtual currency only, no backend. Built from
 reference screenshots (1080x2340). Keep the Uzbek UI text exactly as in the screenshots.
 
 ## Sprite source crops (NOT derivable from code — needed to re-extract)
-Sprites saved 160x160, circular-masked (alpha 0 outside a radius-~79 circle, feather 0.6) in
-assets/images/: wood, sprout, apple, core, bg. Extract from the target reference (1080x2340),
-crop 160x160 centered on a tile, then CopyOpacity with a white circle (radius 79) mask.
-CRITICAL PITFALL (this is what made an earlier pass look "dark/muddy with a green cast"):
-the climbed-board screenshot dims PAST/already-passed tiles to ~60% brightness, so cropping
-wood from there yields dark muddy tiles. ALWAYS crop each sprite from a FULL-BRIGHTNESS,
-UNOBSCURED instance, and sample the crop's center color to verify before installing —
-bright wood center is ~srgb(135,57,30); the dimmed/wrong one is ~srgb(80,46,26).
-Good full-brightness sources & centers:
-- WOOD <- the LOW-progress screenshot (e.g. ...125812..., top UNOPENED rows), center ~(637,667).
-- APPLE+green tile+leaf <- a fully-lit picked apple in the climbed screenshot (...125823...), ~(450,667).
-- SPROUT/mushroom <- top mushroom row of ...125823..., center ~(457,462) (cleanest, no green rim).
-- CORE: no clean reference instance — rebuild = bright WOOD ring + git-original eaten-apple-core
-  center (brighten orig core modulate ~122,108,100; composite via feathered circle r~40).
-- bg: the git-original jungle bg.png (do NOT re-grade it; revert any modulate).
+The board is DENSE: discs FILL each cell and nearly touch (this is what the original looks
+like). Earlier 160x160 sprites had internal padding + neighbour fragments → tiles looked
+small/sparse and the user rejected them hard. FIX = re-crop CLEAN full-bleed circular discs.
+Current sprites are 168x168 in assets/images/ (wood, apple, sprout, core); originals backed
+up in .local/refcrops/orig_*.png.
+Extraction recipe (ImageMagick), crop 168x168 centered on a full-bright UNOBSCURED tile, then
+circular alpha mask: `\( +clone -alpha transparent -fill white -draw "circle 84,84 84,166" \)
+-compose CopyOpacity` (diameter ~164 in the 168 canvas → disc ≈0.976*cell).
+Good full-brightness sources (1080x2340) and crop top-left origins (168x168):
+- WOOD  <- Screenshot_...125812..., origin (284,640)
+- SPROUT<- Screenshot_...125812..., origin (282,974)
+- APPLE <- Screenshot_...125812..., origin (281,1141)
+- CORE  <- Screenshot_...104919... (loss screen), origin (281,473), brightened `-modulate 168,150`
+PITFALL: cropping from a screenshot's PAST/already-passed rows yields dark muddy tiles (the
+game dims them ~60%). Always crop from a full-brightness instance and eyeball the center color
+before installing.
 DECISION: extracting straight from the reference makes tile colors pixel-exact BY CONSTRUCTION;
 code tints/overlays only uniformly lighten/darken and CANNOT fix per-color hue/saturation.
 
 ## Board geometry — ONE measured master grid (do NOT go back to ad-hoc per-axis constants)
-The user rejected the old layout (separate PILL_COL + COL_GAP + colPitch + pitchY=tile*1.15)
-because horizontal pitch ≠ vertical pitch and the pill column was off-grid → "inconsistent,
-drifting" rows. The original game is actually ONE uniform SQUARE grid; rebuild on that.
-Measured from the 1080-wide reference (Screenshot_...125812...) by wood-color column/row scans:
-- 6 columns = 1 multiplier pill (col 0) + 5 tile columns, ALL on the same pitch.
-- Tile column centers x = 278,447,616,784,953 → column pitch ≈ 169 ref px. Green pill center
-  x ≈ 108 = 278−170, so the pill is just column 0 of the same grid.
-- Tile & pill diameter ≈ 147 ref px (measure on a FULL-BRIGHT row; vertical scans
-  under-read the diameter ~123 because the wood circle's top/bottom is shaded).
-- Row pitch ≈ 170 ref px ≈ column pitch → treat as SQUARE: use ONE `pitch` for both axes.
-Implementation (current): `gridScale=width/1080; tile=147*gridScale; pitch=169.5*gridScale;
-pitchY=pitch;` render each row as 6 equal `pitch`-wide square cells, content (pill/tile)
-size=`tile` centered in each cell, row paddingLeft=`gridLeft=(width-6*pitch)/2` → perfectly
-centered, identical gaps everywhere, zero per-row drift. tile/pitch ≈ 0.867 (open board,
-tiles never touch). 7 of 9 rows visible. Verified at 402-wide: columns & rows both ~63 px
-pitch. Pill width set to `tile`; keep pill text fontSize ~10 + small padding so "x 349.68"
-fits the ~55px cell.
+The original is ONE uniform grid: 6 columns = 1 multiplier pill (col 0) + 5 tile columns, all
+on the same horizontal pitch; rows on a slightly shorter vertical pitch. Measured from the
+1080-wide reference (Screenshot_...125812...):
+- Tile column centers x ≈ 281,452,621,790,954 → column pitch ≈ 168 ref px.
+- Disc ≈ 167w x 158h ref px (slightly WIDE ellipse, ratio ~0.95). Discs nearly touch.
+- Row pitch ≈ 166.5 ref px. Title center y≈307; top (faded x349.68) row center y≈480 →
+  title-center→top-row-center gap ≈ 166 ref px.
+Implementation in app/index.tsx (~lines 105-113): `gridScale=width/1080;
+pitch=168*gridScale; pitchY=166.5*gridScale; tile=168*gridScale; pillW=140*gridScale;
+pillH=66*gridScale; gridLeft=29*gridScale; boardTop=insets.top+104;`. Pill renders as
+{width:pillW,height:pillH,borderRadius:pillH/2}. Each row = 6 cells; pill=col0, tiles=cols1-5.
+VERIFIED at 402-wide (gridScale≈0.372): column pitch 62.5, row pitch 62, disc 60w x 57h,
+title center 73, row1 center 135 → gap 62 dev px (matches original ~62). Columns scale to
+~277/446/613/782/948 vs orig 281/452/621/790/954 (within ~2-3 dev px). If you change the grid
+scale, re-measure and retune boardTop (it maps 1:1 to on-screen board Y).
 
-## Per-row tile opacity must match the reference's dimming (visual)
-In tileTypeFor: PAST already-climbed unpicked rows render dimmed — opacity 0.6 is CORRECT
-because the reference's dimmed wood ≈ bright wood × 0.6 (measured). But UPCOMING (not-yet-
-reached) rows are FULL brightness in the reference, so they must be ~1.0, NOT dimmed.
-A stale 0.72 dimming on far upcoming rows (tuned for the old dark sprite) made the board look
-dark — fixed to dist<=2?1:0.9. Re-check this whenever sprite brightness changes.
-
-## Board vertical position / top-spacing calibration (visual)
-The whole grid's vertical placement is ONE value: `boardTop = insets.top + OFFSET` in
-index.tsx layout math. It maps 1:1 to the on-screen Y of the board (the title/header are a
-separate fixed strip), so OFFSET delta == screen-position delta exactly — use a live in-session
-screenshot as the calibration data point, NOT a prior-session screenshot (insets/header can
-differ across sessions and break the 1:1 assumption).
-ANCHOR / "first visible row" definition (this caused two wrong iterations): the clone's
-TOPMOST visible row maps to the reference's HIGHEST-multiplier row x349.68 (which is faint/faded
-at the board's top edge in the screenshot), NOT the first fully-bright wood row below it.
-Measuring from the first bright row makes you place the board too LOW.
-Match the STATUS-BAR-INDEPENDENT title->top-row gap (web preview has no OS status bar; the ref
-phone does — never match absolute Y). Use multiplier PILLS as the per-row anchor (one per row,
-white text / green active pill, at exact row centers; pitch ~170 ref px). Reference
-(Screenshot_...125812..., 1080x2340): title center y≈307; x349.68 pill/row center y≈484 →
-title-center→top-row-center gap = 177 ref px. Scale = deviceWidth/1080 ≈ 0.372 (viewport
-~402x874 ≈ same aspect 0.46) → ~66 device px. So at 402-wide: title center ≈78, top-row
-center should be ≈144. After the master-grid rebuild the value is **boardTop = insets.top + 121**
-(verified at 402-wide: top-row center 145, gap 67). NOTE the absolute number is tied to the
-current grid `pitch`/`tile`; if you change the grid scale, re-measure and retune boardTop.
-Measure programmatically from a saved screenshot (screenshot tool save_to, after temporarily
-lowering the loading timeout line ~91 from 1100→50 then REVERTING): per-row gray-brightness for
-the title band, wood-color threshold (R>110 & G<110) for tile rows, white/green threshold for
-ref pills.
-BOTTOM clearance: boardTop is the ONLY lever and the board is FIXED height (~7 rows, ~450
-device px, overflow:hidden so shrinking height just clips the bottom row). Pushing boardTop
-DOWN shoves the bottom row into the controls on SHORT panes; the "MAVJUD YUTUQ" winInfoBar
-(semi-opaque, only mid-round) makes overlap visually obvious. Validate in the PLAYING state
-(runTest: GAROV then tap a tile) at ~400x720. The reference deliberately leaves a LARGE
-board→panel jungle gap, so the correct (higher) boardTop also clears the panel — moving the
-board UP only increases bottom clearance. The square grid (pitch≈63 at 402-wide) is shorter
-than the old pitchY=tile*1.15, so the board is slightly shorter → bottom clearance improved;
-boardTop 121 verified clean in the PLAYING state.
+## MEASUREMENT GOTCHA (caused a false "rows 73px apart" panic)
+Clone screenshots are 402x874. NEVER crop a region taller than the image then force
+`-resize 1xN!` to a LARGER N — e.g. cropping 900px tall from an 874px image and resizing to
+900 stretches Y by ~1.16x and reports bogus row pitch/disc height. Always crop within bounds
+and use a resize height <= the crop height.
 
 ## Verifying the UI (screenshot gotcha)
-The app shows a ~1100ms branded loading overlay on mount that fades out. The screenshot
-tool RELOADS the page every call, so it always captures the loading screen at t=0 and never
-the game. Use the Playwright testing skill (runTest) to wait past the overlay and exercise
-the board/admin menu — that is the only reliable visual validation here.
+The app shows a ~1100ms branded loading overlay on mount (timeout ~line 91). The screenshot
+tool RELOADS the page every call, so it captures the loading screen at t=0. To grab the board
+for `magick` measurement, temporarily lower that timeout 1100->50, screenshot with save_to,
+then REVERT to 1100. For play-state (apples/core), drive it with the Playwright testing skill
+(runTest): tap GAROV, then tap a tile.
+
+## Per-row tile opacity must match the reference's dimming (visual)
+In tileTypeFor: PAST already-climbed unpicked rows render dimmed (~0.6, matches reference);
+UPCOMING not-yet-reached rows are FULL brightness (~1.0). Re-check whenever sprite brightness
+changes.
 
 ## Design decisions
-- Tiles are OPEN — clear gaps both horizontally and vertically, tiles never touch/overlap.
-  This matches the original game; do not pack/overlap the rows.
+- Tiles are DENSE — discs fill each cell and nearly touch (matches the original). Do NOT revert
+  to the old "open grid, tiles never touch" layout; that was the rejected version.
 - Board shows 7 of 9 multiplier rows and auto-scrolls as the player climbs.
-- "Numbers update in jumps": values snap to the final amount with a subtle scale pop —
-  do NOT add incremental count-up animation.
-- Cash-out reuses the same win ("G'alaba!") overlay/end-state as a top-row win.
+- The clone's TOPMOST visible row maps to the reference's HIGHEST-multiplier row x349.68 (faint
+  at the board top), NOT the first fully-bright wood row below it. Anchor on that.
+- Match the STATUS-BAR-INDEPENDENT title->top-row gap (web preview has no OS status bar; the ref
+  phone does — never match absolute Y).
+- "Numbers update in jumps": values snap with a subtle scale pop — no incremental count-up.
+- Cash-out reuses the same win overlay/end-state as a top-row win.
 - Sprite gloss is a plain semi-transparent white rounded View overlaid on apple/core/sprout
-  (NOT wood) — no gradient lib needed; keep opacity low (~0.16) so it reads as a sheen.
-- Board is nudged down via boardTop: with a fixed 7-row window over 9 rows, the top
-  multiplier row unavoidably reaches the board's top edge near x349, so the ONLY way to keep
-  "spacing from the screen top" at high multipliers is a larger boardTop — you cannot
-  translate board content down without clipping the rows still being climbed.
-- The pill column is NOT special-cased anymore — it is column 0 of the same master grid, so
-  the pill/tile horizontal gap falls out of the uniform `pitch` automatically (no COL_GAP /
-  separate tilesArea). Do not reintroduce per-axis or per-column spacing constants.
+  (NOT wood) — low opacity (~0.16) so it reads as a sheen.
+- The pill column is column 0 of the same master grid — do not reintroduce per-axis or
+  per-column spacing constants.
