@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Apple of Fortune"
+version = "1.0.0"
+id = "artifacts/apple-of-fortune"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 20832
+
+[services.development]
+run = "pnpm --filter @workspace/apple-of-fortune run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/apple-of-fortune", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/apple-of-fortune", "run", "serve" ]
+
+[services.env]
+PORT = "20832"
+BASE_PATH = "/"

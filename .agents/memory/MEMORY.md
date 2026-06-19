@@ -1,0 +1,1 @@
+- [Apple of Fortune game](apple-of-fortune.md) — sprite crop coords + grid geometry + reanimated render-warning fix for the clone.
