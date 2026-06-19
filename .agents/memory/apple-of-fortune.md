@@ -63,6 +63,17 @@ In tileTypeFor: PAST already-climbed unpicked rows render dimmed (~0.6, matches 
 UPCOMING not-yet-reached rows are FULL brightness (~1.0). Re-check whenever sprite brightness
 changes.
 
+## App icon / splash assets (Android install)
+Brand bg = #0c1a12 (dark felt). Hero = glossy red apple emblem (AI-generated, transparent bg).
+Three derived assets in assets/images/ via ImageMagick from one trimmed emblem:
+- icon.png 1024² = apple ~780px on radial felt gradient (#1a3d26→#0c1a12).
+- adaptive-icon.png 1024² = apple ~560px, transparent, centered (kept inside ~66% safe zone so
+  circle/squircle mask doesn't clip it). Paired with adaptiveIcon.backgroundColor #0c1a12.
+- splash.png 1284x2778 portrait = apple ~620px centered on the same felt gradient; splash
+  backgroundColor also #0c1a12, resizeMode contain.
+Don't reuse the generic Expo icon.png (it was a blue placeholder ^). Re-run `eas build -p android
+--profile preview` after changing these to see them on-device.
+
 ## Design decisions
 - Tiles are DENSE — discs fill each cell and nearly touch (matches the original). Do NOT revert
   to the old "open grid, tiles never touch" layout; that was the rejected version.

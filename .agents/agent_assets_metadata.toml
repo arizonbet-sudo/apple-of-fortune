@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "2klipnAJFBAVWesIlkxOB"
+uri = "file://artifacts/apple-of-fortune/assets/images/icon-apple-emblem.png"
+type = "image"
+title = "apple emblem"
