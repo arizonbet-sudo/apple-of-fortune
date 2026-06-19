@@ -91,15 +91,17 @@ export default function AppleOfFortune() {
 
   // ----- layout math (mirrors the 1080px reference grid) -----
   const H_PAD = 8;
-  const PILL_COL = Math.round(width * 0.135);
+  const PILL_COL = Math.round(width * 0.142);
   // breathing room between the multiplier column and the first game column
-  const COL_GAP = Math.round(width * 0.028);
+  const COL_GAP = Math.round(width * 0.022);
   const tilesArea = width - H_PAD * 2 - PILL_COL - COL_GAP;
   const colPitch = tilesArea / COLS;
-  const tile = colPitch * 0.98;
-  const pitchY = tile * 0.8;
+  // smaller tiles with clear horizontal gaps, like the original (tiles do NOT touch)
+  const tile = colPitch * 0.89;
+  // vertical pitch larger than the tile so rows are separated by a small gap (no overlap)
+  const pitchY = tile * 1.15;
   // nudge the whole board down a touch so high multipliers don't crowd the top
-  const boardTop = insets.top + 112;
+  const boardTop = insets.top + 104;
   const boardHeight = VISIBLE_ROWS * pitchY + (tile - pitchY);
 
   const bottomVisible = Math.max(
@@ -281,7 +283,7 @@ export default function AppleOfFortune() {
     if (row < currentRow) {
       if (picks[row] === col)
         return { sprite: "apple", opacity: 1, revealedTile: true };
-      return { sprite: "wood", opacity: 0.52, revealedTile: false };
+      return { sprite: "wood", opacity: 0.6, revealedTile: false };
     }
     if (row === currentRow) {
       return { sprite: "sprout", opacity: 1, revealedTile: false };
@@ -289,7 +291,7 @@ export default function AppleOfFortune() {
     const dist = row - currentRow;
     return {
       sprite: "wood",
-      opacity: dist <= 2 ? 0.96 : 0.56,
+      opacity: dist <= 2 ? 0.97 : 0.72,
       revealedTile: false,
     };
   };
@@ -319,7 +321,7 @@ export default function AppleOfFortune() {
         contentFit="cover"
       />
       <BlurView
-        intensity={12}
+        intensity={7}
         tint="dark"
         style={StyleSheet.absoluteFill}
       />
@@ -771,7 +773,7 @@ function EndControls({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0c2b27" },
-  bgTint: { backgroundColor: "rgba(8,30,28,0.24)" },
+  bgTint: { backgroundColor: "rgba(7,28,30,0.14)" },
 
   headerStrip: {
     backgroundColor: PALETTE.headerStrip,
@@ -854,24 +856,24 @@ const styles = StyleSheet.create({
   pillWrap: { justifyContent: "center", alignItems: "flex-start" },
   pill: {
     backgroundColor: PALETTE.pillBg,
-    borderRadius: 14,
-    paddingHorizontal: 8,
-    height: 26,
-    minWidth: 52,
+    borderRadius: 15,
+    paddingHorizontal: 7,
+    height: 28,
+    minWidth: 54,
     alignItems: "center",
     justifyContent: "center",
   },
   pillActive: { backgroundColor: PALETTE.green },
-  pillText: { color: "#c9d6d2", fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  pillText: { color: "#c9d6d2", fontSize: 10.5, fontFamily: "Inter_600SemiBold" },
   pillTextActive: { color: "#1c3500" },
 
   tilesRow: { flex: 1, flexDirection: "row", alignItems: "center" },
   tileCell: { alignItems: "center", justifyContent: "center" },
   tileShadow: {
     shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
   gloss: {
@@ -969,7 +971,7 @@ const styles = StyleSheet.create({
   winInfoBar: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: PALETTE.inputBg,
+    backgroundColor: "rgba(8,32,40,0.55)",
     borderRadius: 8,
     paddingVertical: 12,
     marginBottom: 8,

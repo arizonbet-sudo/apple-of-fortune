@@ -17,10 +17,12 @@ crop catches neighbor slivers, and the existing 160px masks are already native-r
 perceived quality via rendering instead (expo-blur backdrop, tile drop-shadows, expo-image
 cross-dissolve transition to kill the black flash on source swap), not bigger source crops.
 
-## Board geometry (verified against a 100px grid overlay on the 1080-wide refs)
-PILL_COL ≈ width*0.135 (measured 0.134). colPitch = (width - 2*H_PAD - PILL_COL)/5.
-Tile diameter ≈ 0.98*colPitch (tiles nearly touch). Vertical pitchY ≈ 0.80*tile
-(~19% vertical overlap, NOT 28%). 7 of 9 rows visible. These are already correct in code.
+## Board geometry (corrected against the user's original-game screenshots)
+PILL_COL ≈ width*0.142. colPitch = (width - 2*H_PAD - PILL_COL - COL_GAP)/5.
+The original board is OPEN: tiles do NOT touch. Tile diameter ≈ 0.89*colPitch (clear
+horizontal gap) and crucially the VERTICAL pitch is LARGER than the tile —
+pitchY slightly LARGER than the tile (small gap between rows, NO overlap). 7 of 9 rows
+visible. Do NOT pack rows so they touch/overlap — that reads as cramped and is wrong.
 
 ## Verifying the UI (screenshot gotcha)
 The app shows a ~1100ms branded loading overlay on mount that fades out. The screenshot
@@ -29,17 +31,17 @@ the game. Use the Playwright testing skill (runTest) to wait past the overlay an
 the board/admin menu — that is the only reliable visual validation here.
 
 ## Design decisions
-- Tiles overlap vertically (~28%) but are spaced horizontally — this packed look is the
-  game's signature; keep it if reworking the board.
+- Tiles are OPEN — clear gaps both horizontally and vertically, tiles never touch/overlap.
+  This matches the original game; do not pack/overlap the rows.
 - Board shows 7 of 9 multiplier rows and auto-scrolls as the player climbs.
 - "Numbers update in jumps": values snap to the final amount with a subtle scale pop —
   do NOT add incremental count-up animation.
 - Cash-out reuses the same win ("G'alaba!") overlay/end-state as a top-row win.
 - Sprite gloss is a plain semi-transparent white rounded View overlaid on apple/core/sprout
   (NOT wood) — no gradient lib needed; keep opacity low (~0.16) so it reads as a sheen.
-- Board is nudged down via boardTop (insets.top + ~112): with a fixed 7-row window over 9
-  rows, the top multiplier row unavoidably reaches the board's top edge near x349, so the
-  ONLY way to keep "spacing from the screen top" at high multipliers is a larger boardTop —
-  you cannot translate board content down without clipping the rows still being climbed.
+- Board is nudged down via boardTop: with a fixed 7-row window over 9 rows, the top
+  multiplier row unavoidably reaches the board's top edge near x349, so the ONLY way to keep
+  "spacing from the screen top" at high multipliers is a larger boardTop — you cannot
+  translate board content down without clipping the rows still being climbed.
 - A real horizontal gap between the pill column and tiles needs its own COL_GAP subtracted
   from tilesArea AND a marginLeft on the tiles row (widening PILL_COL just makes pills bigger).
