@@ -43,31 +43,34 @@ dark — fixed to dist<=2?1:0.9. Re-check this whenever sprite brightness change
 
 ## Board vertical position / top-spacing calibration (visual)
 The whole grid's vertical placement is ONE value: `boardTop = insets.top + OFFSET` in
-index.tsx layout math. Tile-top on screen = boardTop + (pitchY-tile)/2 (~4 device px), and
-in any game state the row sitting at the board-container top is at that same screen Y (the
-container is fixed; only the inner rail scrolls). To match the reference's top spacing use the
-STATUS-BAR-INDEPENDENT title->first-row gap (web preview has no status bar; the reference
-phone screenshot does, ~94 ref px ≈ 35 device px — do NOT match absolute Y or you'll be off by
-the status bar): measure title-bottom and topmost-tile-top in the reference (1080x2340),
-gap_ref px × (deviceWidth/1080) = gap_device, then set OFFSET so on-screen
-(tiletop - title_bottom) == gap_device. Device viewport ~402x874 is ~same aspect as the ref
-(0.46), so width-scale ≈ height-scale ≈ 0.372. Measured ref: title-bottom y≈322,
-first-row tile-top y≈566 -> gap 244 ref ≈ 91 device; OFFSET 116 was too high, 170 matches.
-Measure edges programmatically from a saved screenshot (screenshot tool save_to) — per-row
-gray-brightness profile for the title band, wood-color threshold (R>110 & G<110) for tile top.
-TRADEOFF (bottom clearance vs top spacing): boardTop is the ONLY lever and the board is a
-FIXED height (~7 rows, ~450 device px) — pushing it down to perfect the top gap shoves the
-bottom row into the bottom controls on SHORT preview panes. The "MAVJUD YUTUQ" (Current Win)
-panel — the PlayingControls winInfoBar, only shown mid-round — has a semi-opaque background,
-so its overlap with the bottom tile row is VISUALLY obvious; the betting-state buttons have
-transparent gaps so their (worse) overlap is NOT noticed. Validate the bottom gap in the
-PLAYING state (runTest: GAROV then tap a tile) at a SHORT viewport (~400x720), not just 874
-(at 874 the gap is huge and hides the problem). Reducing boardHeight is NOT an option — the
-board has overflow:hidden so a shorter height just clips the bottom row. boardTop 170 matched
-the reference top but gave only ~8-12px bottom gap at 720; 140 restores a clean ~40px gap
-while keeping a comfortable title->first-row gap. There is no separate internal bottom
-padding/offset constant — tiles sit ~4px above the board's bottom edge by the (tile-pitchY)
-height term; the only way to make tiles "sit higher" is to lower boardTop.
+index.tsx layout math. It maps 1:1 to the on-screen Y of the board (the title/header are a
+separate fixed strip), so OFFSET delta == screen-position delta exactly — use a live in-session
+screenshot as the calibration data point, NOT a prior-session screenshot (insets/header can
+differ across sessions and break the 1:1 assumption).
+ANCHOR / "first visible row" definition (this caused two wrong iterations): the clone's
+TOPMOST visible row maps to the reference's HIGHEST-multiplier row x349.68 (which is faint/faded
+at the board's top edge in the screenshot), NOT the first fully-bright wood row below it.
+Measuring from the first bright row makes you place the board too LOW.
+Match the STATUS-BAR-INDEPENDENT title->top-row gap (web preview has no OS status bar; the ref
+phone does — never match absolute Y). Use multiplier PILLS as the per-row anchor (one per row,
+white text / green active pill, at exact row centers; pitch ~170 ref px). Reference
+(Screenshot_...125812..., 1080x2340): title center y≈307; x349.68 pill/row center y≈484 →
+title-center→top-row-center gap = 177 ref px. Scale = deviceWidth/1080 ≈ 0.372 (viewport
+~402x874 ≈ same aspect 0.46) → ~66 device px. So at 402-wide: title center ≈78, top-row
+center should be ≈144 → **OFFSET 122** (verified: 122 gives top-row center 145, gap 67).
+Earlier OFFSETs 170 and 140 were too low because they measured from the first bright row;
+116 was close; 122 is the reference-correct value.
+Measure programmatically from a saved screenshot (screenshot tool save_to, after temporarily
+lowering the loading timeout line ~91 from 1100→50 then REVERTING): per-row gray-brightness for
+the title band, wood-color threshold (R>110 & G<110) for tile rows, white/green threshold for
+ref pills.
+BOTTOM clearance: boardTop is the ONLY lever and the board is FIXED height (~7 rows, ~450
+device px, overflow:hidden so shrinking height just clips the bottom row). Pushing boardTop
+DOWN shoves the bottom row into the controls on SHORT panes; the "MAVJUD YUTUQ" winInfoBar
+(semi-opaque, only mid-round) makes overlap visually obvious. Validate in the PLAYING state
+(runTest: GAROV then tap a tile) at ~400x720. The reference deliberately leaves a LARGE
+board→panel jungle gap, so the correct (higher) boardTop also clears the panel — moving the
+board UP only increases bottom clearance. 122 < 140 (already-clean), so 122 is safe.
 
 ## Verifying the UI (screenshot gotcha)
 The app shows a ~1100ms branded loading overlay on mount that fades out. The screenshot
