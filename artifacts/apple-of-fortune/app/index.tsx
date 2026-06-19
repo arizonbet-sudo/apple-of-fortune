@@ -150,9 +150,8 @@ export default function AppleOfFortune() {
     if (!playing || currentRow === 0 || busyRef.current) return;
     busyRef.current = true;
     adjust(availableWin);
-    setPhase("betting");
-    setCurrentRow(0);
-    setPicks([]);
+    setWinAmount(availableWin);
+    setPhase("won");
   }, [adjust, availableWin, currentRow, playing]);
 
   const playAgain = useCallback(() => {
@@ -232,9 +231,11 @@ export default function AppleOfFortune() {
         </Pressable>
 
         <View style={styles.balancePill}>
-          <Text style={styles.balanceText} numberOfLines={1}>
-            {formatMoney(balance, 2)} сўм
-          </Text>
+          <PopValue
+            value={balance}
+            format={(n) => `${formatMoney(n, 2)} сўм`}
+            style={styles.balanceText}
+          />
           <View style={styles.plusBtn}>
             <Ionicons name="add" size={20} color="#fff" />
           </View>
@@ -369,6 +370,40 @@ export default function AppleOfFortune() {
   );
 }
 
+/* ---------------- Animated number ---------------- */
+
+function PopValue({
+  value,
+  format,
+  style,
+}: {
+  value: number;
+  format: (n: number) => string;
+  style?: any;
+}) {
+  const scale = useSharedValue(1);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    // numbers jump straight to the final value with a subtle pop, no counting
+    scale.value = withSequence(
+      withTiming(1.16, { duration: 110 }),
+      withTiming(1, { duration: 150 }),
+    );
+  }, [value, scale]);
+  const aStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+  return (
+    <Animated.Text style={[style, aStyle]} numberOfLines={1}>
+      {format(value)}
+    </Animated.Text>
+  );
+}
+
 /* ---------------- Footer variants ---------------- */
 
 function BettingControls({
@@ -446,7 +481,11 @@ function PlayingControls({
     <View>
       <View style={styles.winInfoRow}>
         <Text style={styles.winInfoLabel}>MAVJUD YUTUQ</Text>
-        <Text style={styles.winInfoValue}>{formatMoney(available)} сўм</Text>
+        <PopValue
+          value={available}
+          format={(n) => `${formatMoney(n)} сўм`}
+          style={styles.winInfoValue}
+        />
       </View>
       <Pressable
         style={[styles.cashBtn, !canCash && styles.disabled]}
