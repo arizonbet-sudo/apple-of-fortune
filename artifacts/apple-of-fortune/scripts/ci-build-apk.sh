@@ -9,6 +9,34 @@ set -euo pipefail
 APP_DIR="artifacts/apple-of-fortune"
 cd "$APP_DIR"
 
+# The in-app icon uploader commits whatever the phone image picker returns,
+# which is frequently a JPEG saved under a .png name. aapt2 then refuses to
+# compile it ("file failed to compile"). Re-encode the launcher icons into
+# genuine, profile-stripped RGBA PNGs so the build is robust to any uploaded
+# image format. ImageMagick is preinstalled on GitHub-hosted Ubuntu runners.
+echo "==> Sanitize launcher icons (force valid RGBA PNG for aapt2)"
+sanitize_png() {
+  local f="$1"
+  [ -f "$f" ] || return 0
+  local tool=""
+  if command -v magick >/dev/null 2>&1; then tool="magick"
+  elif command -v convert >/dev/null 2>&1; then tool="convert"; fi
+  if [ -z "$tool" ]; then
+    echo "WARN: ImageMagick not found; leaving $f untouched"
+    return 0
+  fi
+  if "$tool" "$f" -strip -background none -alpha on PNG32:"$f.fixed"; then
+    mv "$f.fixed" "$f"
+    echo "    re-encoded $f -> $(file -b "$f" 2>/dev/null || echo PNG)"
+  else
+    echo "ERROR: failed to re-encode $f" >&2
+    rm -f "$f.fixed"
+    exit 1
+  fi
+}
+sanitize_png assets/images/icon.png
+sanitize_png assets/images/adaptive-icon.png
+
 echo "==> Expo prebuild (android)"
 pnpm exec expo prebuild --platform android --no-install
 
