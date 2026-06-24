@@ -16,6 +16,7 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLS, formatMoney, PALETTE, Settings } from "@/constants/game";
+import { ApkBuilder } from "./ApkBuilder";
 
 type Props = {
   visible: boolean;
@@ -127,6 +128,9 @@ export function AdminMenu({
               onPick={() => pickImage("loadingLogoUri")}
               onClear={() => setSetting("loadingLogoUri", null)}
             />
+
+            <ApkBuilder />
+
             <SegmentRow
               label="Change Apple Position"
               value={settings.applePos}
