@@ -1,13 +1,15 @@
 export const COLS = 5;
 export const VISIBLE_ROWS = 7;
 
-// Multipliers from bottom (index 0) to top (index 8).
+// Multipliers from bottom (index 0) to top (index 9), matching the original
+// Coldbet "Apple of Fortune" ladder. Step ratios: x1.25 (4 safe), x1.667
+// (3 safe), x2.5 (2 safe), x5 (1 safe). The bottom row is 1.23.
 export const MULTIPLIERS = [
-  1.54, 1.93, 2.41, 4.02, 6.71, 11.18, 27.97, 69.93, 349.68,
+  1.23, 1.54, 1.93, 2.41, 4.02, 6.71, 11.18, 27.97, 69.93, 349.68,
 ];
 
 // Number of safe (apple) cells per row, bottom -> top. The rest are cores.
-export const SAFE_COUNTS = [4, 4, 4, 3, 3, 3, 2, 2, 1];
+export const SAFE_COUNTS = [4, 4, 4, 4, 3, 3, 3, 2, 2, 1];
 
 export const ROWS = MULTIPLIERS.length;
 

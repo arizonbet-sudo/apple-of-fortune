@@ -113,7 +113,10 @@ export default function AppleOfFortune() {
     0,
     Math.min(currentRow - 2, ROWS - VISIBLE_ROWS),
   );
-  const railY = (bottomVisible - 2) * pitchY;
+  // Anchor so the `bottomVisible` row sits in the bottom visible slot. This is
+  // derived from ROWS/VISIBLE_ROWS so it stays correct as the ladder length
+  // changes (e.g. the 10-row ladder with the 1.23 base row).
+  const railY = (VISIBLE_ROWS - ROWS + bottomVisible) * pitchY;
   const scroll = useSharedValue(railY);
   useEffect(() => {
     scroll.value = withTiming(railY, { duration: 360, easing: EASE });
