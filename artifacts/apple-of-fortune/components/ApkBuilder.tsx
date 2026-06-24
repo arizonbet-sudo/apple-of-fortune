@@ -17,6 +17,8 @@ import {
   ACTIONS_URL,
   RELEASES_URL,
   TOKEN_CREATE_URL,
+  apkUrlForRun,
+  clearLastBuild,
   clearToken,
   getBuildStatus,
   getLatestApkUrl,
@@ -54,6 +56,7 @@ export function ApkBuilder() {
 
   const commitShaRef = useRef<string | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const polling = useRef(false);
   const mounted = useRef(true);
 
   const clearPoll = useCallback(() => {
@@ -67,6 +70,10 @@ export function ApkBuilder() {
     const sha = commitShaRef.current;
     const tk = token;
     if (!sha || !tk) return;
+    // single-flight: never run two polls at once (e.g. timer + manual tap).
+    if (polling.current) return;
+    polling.current = true;
+    clearPoll();
     try {
       const st = await getBuildStatus(tk, sha);
       if (!mounted.current) return;
@@ -74,17 +81,21 @@ export function ApkBuilder() {
         setStatusText("Build queued — waiting for GitHub to start it…");
       } else if (st.status === "completed") {
         if (st.conclusion === "success") {
-          const url = await getLatestApkUrl(tk);
+          const url = st.runNumber
+            ? apkUrlForRun(st.runNumber)
+            : await getLatestApkUrl(tk);
           if (!mounted.current) return;
           setApkUrl(url);
           setPhase("done");
           setStatusText("Build finished. Your new APK is ready to download.");
+          await clearLastBuild();
           return;
         }
         setPhase("error");
         setErrorMsg(
           `Build ${st.conclusion ?? "failed"}. Open the build log on GitHub for details.`,
         );
+        await clearLastBuild();
         return;
       } else if (st.status === "in_progress") {
         setStatusText("Building your APK… (this takes ~15–20 minutes)");
@@ -98,8 +109,10 @@ export function ApkBuilder() {
         `Couldn't check status (${e?.message ?? "network error"}). Retrying…`,
       );
       pollTimer.current = setTimeout(poll, POLL_MS);
+    } finally {
+      polling.current = false;
     }
-  }, [token]);
+  }, [token, clearPoll]);
 
   // Load saved token + resume an in-progress build on mount.
   useEffect(() => {

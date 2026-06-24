@@ -36,7 +36,11 @@ export type BuildStatusResult = {
   status: "queued" | "in_progress" | "completed" | "unknown";
   conclusion: string | null;
   htmlUrl: string | null;
+  runNumber: number | null;
 };
+
+const WORKFLOW_NAME = "Build Android APK";
+const WORKFLOW_PATH = ".github/workflows/build-android-apk.yml";
 
 /* ----------------------------- token storage ----------------------------- */
 
@@ -67,6 +71,10 @@ export async function loadLastBuild(): Promise<LastBuild | null> {
 
 async function saveLastBuild(value: LastBuild): Promise<void> {
   await AsyncStorage.setItem(LAST_BUILD_KEY, JSON.stringify(value));
+}
+
+export async function clearLastBuild(): Promise<void> {
+  await AsyncStorage.removeItem(LAST_BUILD_KEY);
 }
 
 /* ------------------------------ http helper ------------------------------ */
@@ -249,18 +257,35 @@ export async function getBuildStatus(
 ): Promise<BuildStatusResult> {
   const data = await gh(
     token,
-    `/repos/${GH_OWNER}/${GH_REPO}/actions/runs?head_sha=${commitSha}&per_page=1`,
+    `/repos/${GH_OWNER}/${GH_REPO}/actions/runs?head_sha=${commitSha}&per_page=20`,
   );
-  const run = data.workflow_runs?.[0];
+  const runs: any[] = data.workflow_runs ?? [];
+  // Only consider the APK workflow — other workflows may run on the same commit.
+  const apkRuns = runs.filter(
+    (r) => r.path === WORKFLOW_PATH || r.name === WORKFLOW_NAME,
+  );
+  const run = (apkRuns.length ? apkRuns : runs)[0];
   if (!run) {
-    return { found: false, status: "queued", conclusion: null, htmlUrl: null };
+    return {
+      found: false,
+      status: "queued",
+      conclusion: null,
+      htmlUrl: null,
+      runNumber: null,
+    };
   }
   return {
     found: true,
     status: run.status as BuildStatusResult["status"],
     conclusion: run.conclusion ?? null,
     htmlUrl: run.html_url ?? null,
+    runNumber: typeof run.run_number === "number" ? run.run_number : null,
   };
+}
+
+/** Deterministic download URL for the APK produced by a given run number. */
+export function apkUrlForRun(runNumber: number): string {
+  return `https://github.com/${GH_OWNER}/${GH_REPO}/releases/download/apk-build-${runNumber}/app-release.apk`;
 }
 
 /* ------------------------------ latest APK ------------------------------- */
