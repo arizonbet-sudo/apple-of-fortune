@@ -15,24 +15,30 @@ cd "$APP_DIR"
 # genuine, profile-stripped RGBA PNGs so the build is robust to any uploaded
 # image format. ImageMagick is preinstalled on GitHub-hosted Ubuntu runners.
 echo "==> Sanitize launcher icons (force valid RGBA PNG for aapt2)"
+# Ensure at least one image tool is available. ffmpeg is preinstalled on
+# GitHub-hosted runners; if nothing is present, install ImageMagick via apt.
+if ! command -v ffmpeg >/dev/null 2>&1 \
+  && ! command -v magick >/dev/null 2>&1 \
+  && ! command -v convert >/dev/null 2>&1; then
+  echo "    no image tool found; installing imagemagick"
+  sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick >/dev/null
+fi
 sanitize_png() {
   local f="$1"
   [ -f "$f" ] || return 0
-  local tool=""
-  if command -v magick >/dev/null 2>&1; then tool="magick"
-  elif command -v convert >/dev/null 2>&1; then tool="convert"; fi
-  if [ -z "$tool" ]; then
-    echo "WARN: ImageMagick not found; leaving $f untouched"
-    return 0
-  fi
-  if "$tool" "$f" -strip -background none -alpha on PNG32:"$f.fixed"; then
-    mv "$f.fixed" "$f"
-    echo "    re-encoded $f -> $(file -b "$f" 2>/dev/null || echo PNG)"
+  local out="${f}.fixed.png"
+  if command -v magick >/dev/null 2>&1; then
+    magick "$f" -strip -background none -alpha on PNG32:"$out"
+  elif command -v convert >/dev/null 2>&1; then
+    convert "$f" -strip -background none -alpha on PNG32:"$out"
+  elif command -v ffmpeg >/dev/null 2>&1; then
+    ffmpeg -y -loglevel error -i "$f" -pix_fmt rgba "$out"
   else
-    echo "ERROR: failed to re-encode $f" >&2
-    rm -f "$f.fixed"
+    echo "ERROR: no image tool available to re-encode $f" >&2
     exit 1
   fi
+  mv "$out" "$f"
+  echo "    re-encoded $f -> $(file -b "$f" 2>/dev/null || echo PNG)"
 }
 sanitize_png assets/images/icon.png
 sanitize_png assets/images/adaptive-icon.png
