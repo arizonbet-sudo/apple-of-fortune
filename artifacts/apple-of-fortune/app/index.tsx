@@ -401,6 +401,10 @@ export default function AppleOfFortune() {
           {rowIndexes.map((row) => {
             const railTop = (ROWS - 1 - row) * pitchY;
             const isActive = row === currentRow && playing;
+            // the current (bottom) row's pill is green during betting too, like
+            // the reference: betting shows an empty green pill on the start row.
+            const isCurrentPill =
+              row === currentRow && (phase === "betting" || playing);
             const showMultiplier = phase !== "betting";
             return (
               <View
@@ -416,13 +420,13 @@ export default function AppleOfFortune() {
                     style={[
                       styles.pill,
                       { width: pillW, height: pillH, borderRadius: pillH / 2 },
-                      isActive && styles.pillActive,
+                      isCurrentPill && styles.pillActive,
                     ]}
                   >
                     <Text
                       style={[
                         styles.pillText,
-                        isActive && styles.pillTextActive,
+                        isCurrentPill && styles.pillTextActive,
                       ]}
                       numberOfLines={1}
                     >
